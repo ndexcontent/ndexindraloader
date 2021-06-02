@@ -161,10 +161,15 @@ class Indra(object):
 
     def _remove_original_edges(self, net_cx=None, remove_orig_edges=None):
         """
+        Removes original edges from network inplace
+        if `remove_orig_edges` is ``True``
 
-        :param net_cx:
-        :param remove_orig_edges:
-        :return:
+        :param net_cx: Network to remove edges on
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+        :param remove_orig_edges: If ``True`` then original edges are removed
+                                  from network otherwise nothing is done.
+        :type remove_orig_edges: bool
+        :return: None
         """
         if remove_orig_edges is None or remove_orig_edges is False:
             return
@@ -333,11 +338,47 @@ class Indra(object):
                            target_node_id=None,
                            stmt_list=None):
         """
+        Given a list of statements `stmt_list` this method adds a single
+        edge to the network `net_cx`. This is done by first merging all
+        the statements with matching english statements and
+        adding them to one of three list attributes
+        (forward statements aka source to target,
+        reverse statements target to source,
+        and no direction statements) on the edge. The merged
+        statement has the interaction followed by parenthesis
+        that contain numbers corresponding to number of sources
+        for each statement. For web enabled network viewers
+        these numbers are links to INDRA database showing the
+        evidence.
 
-        :param net_cx:
-        :param src_node_id:
-        :param target_node_id:
-        :param stmt_list:
+        The forward statement attribute name is:
+        ``SOURCE NODE NAME => TARGET NODE NAME``
+
+        The reverse statement attribute name is:
+        ``TARGET NODE NAME => SOURCE NODE NAME``
+
+        The no direction statement attribute name is:
+        ``SOURCE NODE NAME - TARGET NODE NAME``
+
+
+        Other added attributes:
+
+        ``Directed`` - ``True`` if there are one or more
+                       forward statements.
+
+        ``Reverse Directed`` - ``True`` if there are one or
+                       more reverse statements.
+
+        ``Created by Indra`` - Set to ``True``
+
+        :param net_cx: Network to update
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+        :param src_node_id: Source Node Id
+        :type src_node_id: int
+        :param target_node_id: Target Node Id
+        :type target_node_id: int
+        :param stmt_list: Statements which are `dict` objects
+        :type stmt_list: list
         :return:
         """
         edge_id = net_cx.create_edge(edge_source=src_node_id,
@@ -414,8 +455,23 @@ class Indra(object):
         net_cx.set_edge_attribute(edge_id, ' ' + src_name_str + ' - ' + tar_name_str,
                                   nodirect_list, type='list_of_string')
 
-        net_cx.set_edge_attribute(edge_id, 'Created By Indra',
+        net_cx.set_edge_attribute(edge_id, 'Created by Indra',
                                   True, type='boolean')
+
+        directedval = False
+
+        if len(forward_list) > 0:
+            directedval = True
+
+        reversedirectedval = False
+        if len(reverse_list) > 0:
+            reversedirectedval = True
+
+        net_cx.set_edge_attribute(edge_id, 'Directed', directedval,
+                                  type='boolean')
+        net_cx.set_edge_attribute(edge_id, 'Reverse Directed',
+                                  reversedirectedval,
+                                  type='boolean')
 
         return edge_id
 
