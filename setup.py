@@ -20,6 +20,7 @@ with open('HISTORY.rst') as history_file:
 
 requirements = ['ndex2>=3.4.0,<4.0.0',
                 'ndexutil>=0.13.1',
+                'networkx',
                 'requests',
                 'tqdm']
 
