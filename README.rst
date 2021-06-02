@@ -1,13 +1,13 @@
-=========================
+=============================
 NDEx Indra Content Loader
-=========================
+=============================
 
 
 .. image:: https://img.shields.io/pypi/v/ndexindraloader.svg
         :target: https://pypi.python.org/pypi/ndexindraloader
 
 .. image:: https://img.shields.io/travis/ndexcontent/ndexindraloader.svg
-        :target: https://travis-ci.org/ndexcontent/ndexindraloader
+        :target: https://travis-ci.com/ndexcontent/ndexindraloader
 
 .. image:: https://readthedocs.org/projects/ndexindraloader/badge/?version=latest
         :target: https://ndexindraloader.readthedocs.io/en/latest/?badge=latest
@@ -16,19 +16,16 @@ NDEx Indra Content Loader
 
 
 
-Python Boilerplate contains all the boilerplate you need to create a Python NDEx Content Loader package.
-
-
-* Free software: BSD license
-* Documentation: https://ndexindraloader.readthedocs.io.
-
+This loader annotates existing networks with `INDRA <https://indra.readthedocs.io/>`__
 
 
 Dependencies
 ------------
 
-* `ndex2 <https://pypi.org/project/ndex2>`_
-* `ndexutil <https://pypi.org/project/ndexutil>`_
+* `ndex2 <https://pypi.org/project/ndex2>`__
+* `ndexutil <https://pypi.org/project/ndexutil>`__
+* `requests <https://pypi.org/project/requests>`__
+* `tqdm <https://pypi.org/project/tqdm>`__
 
 Compatibility
 -------------
@@ -91,6 +88,13 @@ The default path for this configuration is :code:`~/.ndexutils.conf` but can be 
     password = <NDEx password>
     server = <NDEx server(omit http) ie public.ndexbio.org>
 
+    # Add the following to config
+    # to use alternate destination account/server
+    dest_user = <NDEx destination username>
+    dest_password = <NDEx destination password>
+    dest_server = <NDEx destination server (omit http) ie public.ndexbio.org>
+
+
 **Example configuration file**
 
 .. code-block::
@@ -101,11 +105,17 @@ The default path for this configuration is :code:`~/.ndexutils.conf` but can be 
     password = somepassword123
     server = dev.ndexbio.org
 
+With optional alternate destination:
 
-Needed files
-------------
+.. code-block::
 
-**TODO:** Add description of needed files
+    user = joe123
+    password = somepassword123
+    server = dev.ndexbio.org
+
+    dest_user = joebob123
+    dest_password = anotherpassword123
+    dest_server = public.ndexbio.org
 
 
 Usage
