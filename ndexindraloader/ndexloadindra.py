@@ -494,6 +494,7 @@ class NDExIndraLoader(object):
                 save_indra_res = False
 
             net_cx, indra_res = indra.annotate_network(net_cx=net_tuple[0],
+                                                       netprefix=self._args.netprefix,
                                                        indraresult=indra_data)
 
             if self._template is not None:
