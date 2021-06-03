@@ -123,6 +123,10 @@ class Indra(object):
     NON_DIRECTIONAL_TYPES = ['ActiveForm', 'Association', 'Complex',
                              'Migration']
 
+    CREATED_BY_INDRA = 'Created by Indra'
+    DIRECTED = 'directed'
+    REVERSE_DIRECTED = 'reverse directed'
+
     def __init__(self, subgraph_endpoint=None,
                  timeout=600):
         """
@@ -455,7 +459,7 @@ class Indra(object):
         net_cx.set_edge_attribute(edge_id, ' ' + src_name_str + ' - ' + tar_name_str,
                                   nodirect_list, type='list_of_string')
 
-        net_cx.set_edge_attribute(edge_id, 'Created by Indra',
+        net_cx.set_edge_attribute(edge_id, Indra.CREATED_BY_INDRA,
                                   True, type='boolean')
 
         directedval = False
@@ -467,11 +471,14 @@ class Indra(object):
         if len(reverse_list) > 0:
             reversedirectedval = True
 
-        net_cx.set_edge_attribute(edge_id, 'Directed', directedval,
+        net_cx.set_edge_attribute(edge_id, Indra.DIRECTED, directedval,
                                   type='boolean')
-        net_cx.set_edge_attribute(edge_id, 'Reverse Directed',
+        net_cx.set_edge_attribute(edge_id, Indra.REVERSE_DIRECTED,
                                   reversedirectedval,
                                   type='boolean')
+
+        new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
+        net_cx.set_edge_attribute(edge_id, 'PreCollapsedCount', new_evidence_cnt, type='integer')
 
         return edge_id
 
