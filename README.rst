@@ -22,7 +22,7 @@ NDEx Indra Content Loader
 
 This loader annotates existing networks with `subgraph service <https://network.indra.bio/dev/subgraph>`__
 created by `INDRA <https://indra.readthedocs.io>`__ The annotations added are put on
-as a single separate edges (blue edges in image above)
+as a single separate edges (blue edges in image below)
 within this edge are three main attributes:
 
 * For **forward** interactions  ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 => GRM4`
@@ -35,6 +35,11 @@ Within the above attributes are interactions and weblinks back to INDRA containi
 interaction. In addition, there are boolean edge attributes denoting if the **forward** list
 contains entries, named ``directed``, or if the **reverse** list contains entries ``reverse directed``
 
+.. image:: https://github.com/ndexcontent/ndexindraloader/blob/main/docs/images/example.png
+        :alt: Image of network annotated by INDRA subgraph service
+
+.. image:: https://github.com/ndexcontent/ndexindraloader/blob/main/docs/images/example_edge.png
+        :alt: Image of pop up dialog showing single INDRA subgraph service edge
 
 
 
