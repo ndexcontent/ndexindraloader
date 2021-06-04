@@ -15,9 +15,125 @@ NDEx Indra Content Loader
 
 
 
+.. image:: https://github.com/ndexcontent/ndexindraloader/blob/main/docs/images/example.png
+        :alt: Image of network annotated by INDRA subgraph service
 
-This loader annotates existing networks with `INDRA <https://indra.readthedocs.io/>`__
 
+
+This loader annotates existing networks with `subgraph service <https://network.indra.bio/dev/subgraph>`__
+created by `INDRA <https://indra.readthedocs.io>`__ The annotations added are put on
+as a single separate edges (blue edges in image above)
+within this edge are three main attributes:
+
+* For **forward** interactions  ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 => GRM4`
+
+* For **reverse** interactions ``TARGET NODE NAME => SOURCE NODE NAME`` aka `GRM4 => GRM7`
+
+* For **no direction** interactions ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 - GRM4`
+
+Within the above attributes are interactions and weblinks back to INDRA containing evidence for the
+interaction. In addition, there are boolean edge attributes denoting if the **forward** list
+contains entries, named ``directed``, or if the **reverse** list contains entries ``reverse directed``
+
+
+
+
+
+Technical details
+-------------------
+
+.. note::
+
+    Due to limitations with the service only networks with 100 nodes or less can be analyzed
+
+
+.. note::
+
+    The service takes a JSON document with a list of node names. This loader uses the node name
+    in the network and also includes any entries under ``member`` node attribute as node names.
+
+1. The service takes a list of node names and returns a JSON document containing edges and statements like
+the following:
+
+.. code-block::
+
+    "edge": [
+        {
+          "name": "GRM7",
+          "namespace": "HGNC",
+          "identifier": "4599",
+          "lookup": "https://identifiers.org/hgnc:4599"
+        },
+        {
+          "name": "GRM4",
+          "namespace": "HGNC",
+          "identifier": "4596",
+          "lookup": "https://identifiers.org/hgnc:4596"
+        }
+      ],
+      "stmts": {
+        "6773678678801811": {
+          "stmt_type": "Inhibition",
+          "evidence_count": 1,
+          "stmt_hash": 6773678678801811,
+          "source_counts": {
+            "reach": 1
+          },
+          "belief": 0.65,
+          "curated": false,
+          "english": "GRM7 inhibits GRM4.",
+          "weight": 0.4307829160924542,
+          "residue": null,
+          "position": null,
+          "initial_sign": null,
+          "db_url_hash": "https://db.indra.bio/statements/from_hash/6773678678801811?format=html",
+        },
+        .
+        .
+
+
+
+2. For each "edge", the statements above are grouped by their "english" phrase
+   and put into one of three lists: forward (meaning source X target), reverse (meaning target X source), and
+   no direction (if interaction was one of the following: ``ActiveForm, Association, Complex, Migration``)
+
+3. These lists are renamed as follows:
+
+   * **forward** ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 => GRM4`
+
+   * **reverse** ``TARGET NODE NAME => SOURCE NODE NAME`` aka `GRM4 => GRM7`
+
+   * **no direction** ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 - GRM4`
+
+   .. note::
+
+        This approach results in a lot of unique node attributes.
+
+4. The grouped statements are added as values to the above lists in the following format:
+
+    .. code-block::
+
+        <INTERACTION> (#, #, #)
+
+    There are 46 interaction types and include names like `activates, binds, inhibits`.
+    The ``#`` is evidence count for that statement and it is a clickable html link to INDRA
+    where the evidence for the given statement can be found.
+
+    **Example:**
+
+    .. code-block::
+
+        activates(3,2), inhibits(1)
+
+5. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
+
+6. ``Created by Indra`` edge attribute set to ``True`` and added to the edge.
+
+6. If **forward** list contains entries then ``directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
+
+7. If **reverse** list contains entries then ``reverse directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
+
+8. ``PreCollapsedCount`` edge attribute is added and is the sum of entries in all three lists **forward, reverse, no direction**
 
 Dependencies
 ------------
