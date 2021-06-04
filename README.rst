@@ -13,13 +13,6 @@ NDEx Indra Content Loader
         :target: https://ndexindraloader.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-
-
-.. image:: https://github.com/ndexcontent/ndexindraloader/blob/main/docs/images/example.png
-        :alt: Image of network annotated by INDRA subgraph service
-
-
-
 This loader annotates existing networks with `subgraph service <https://network.indra.bio/dev/subgraph>`__
 created by `INDRA <https://indra.readthedocs.io>`__ The annotations added are put on
 as a single separate edges (blue edges in image below)
