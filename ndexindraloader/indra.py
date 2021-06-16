@@ -112,7 +112,8 @@ def remove_edge(net_cx=None, edge_id=None):
 
 class Indra(object):
     """
-    Class to query Indra service
+    Class to query Indra service and annotate a
+    :py:class:`~ndex2.nice_cx_network.NiceCXNetwork` network
     """
 
     SUBGRAPH_ENDPOINT = 'https://network.indra.bio/dev/subgraph'
@@ -122,10 +123,26 @@ class Indra(object):
 
     NON_DIRECTIONAL_TYPES = ['ActiveForm', 'Association', 'Complex',
                              'Migration']
+    """
+    These statement types aka 'stmt_type' are non directional
+    """
 
-    CREATED_BY_INDRA = 'Created by Indra'
+    SOURCE = 'edge source'
+    """
+    Name of edge attribute to denote source of edge
+    """
+
     DIRECTED = 'directed'
+    """
+    Name of edge attribute to denote that edge is directed
+    """
+
     REVERSE_DIRECTED = 'reverse directed'
+    """
+        Name of edge attribute to denote that edge is directed in reverse
+    """
+
+    PRECOLLAPSED_COUNT = 'pre-collapsed count'
 
     def __init__(self, subgraph_endpoint=None,
                  timeout=600):
@@ -145,10 +162,17 @@ class Indra(object):
 
     def _get_indra_result(self, net_cx=None, indraresult=None):
         """
+        Queries INDRA REST service with given network unless
+        **indraresult** is not ``None`` in which case that is returned
 
-        :param net_cx:
-        :param indraresult:
-        :return:
+        :param net_cx: Network to use for query
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+        :param indraresult: Way to pass in cached result that is
+                            used in leiu of querying the INDRA service.
+        :type indraresult: dict
+        :return: Value of **indraresult** if not ``None`` otherwise
+                 response from querying INDRA service
+        :rtype: dict
         """
         if indraresult is not None:
             return indraresult, 0
@@ -187,7 +211,7 @@ class Indra(object):
         del edges_to_remove
 
     def annotate_network(self, net_cx=None, indraresult=None,
-                         netprefix='Indra annotated - ',
+                         netprefix='INDRA annotated - ',
                          remove_orig_edges=False,
                          min_evidence_cnt=1,
                          keep_self_edges=False):
@@ -248,15 +272,15 @@ class Indra(object):
             logger.debug(key + ' # of statements: ' + str(len(stmt_hash[key])))
             for stmt in stmt_hash[key]:
                 logger.debug(stmt['stmt_type'] + ' (' + stmt['english'] +
-                            ') belief=' + str(stmt['belief']) +
-                            ' hash=' + str(stmt['stmt_hash']))
+                             ') belief=' + str(stmt['belief']) +
+                             ' hash=' + str(stmt['stmt_hash']))
             split_key = key.split('_')
             s_node_id = int(split_key[0])
             t_node_id = int(split_key[1])
-            edge_id = self._single_edge_adder(net_cx=net_cx,
-                                              src_node_id=s_node_id,
-                                              target_node_id=t_node_id,
-                                              stmt_list=stmt_hash[key])
+            self._single_edge_adder(net_cx=net_cx,
+                                    src_node_id=s_node_id,
+                                    target_node_id=t_node_id,
+                                    stmt_list=stmt_hash[key])
 
         net_cx.set_network_attribute('Indra query time in seconds',
                                      values=str(elapsed_time))
@@ -303,9 +327,9 @@ class Indra(object):
         """
         This function takes the network in `net_cx` and extracts
         all the node names to create a :py:func:`dict` that conforms
-        to Indra format.
+        to INDRA format.
 
-        Indra format:
+        INDRA format:
 
         .. code-block::
 
@@ -318,7 +342,7 @@ class Indra(object):
 
         :param net_cx: Network to extract node names from
         :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
-        :return:
+        :return: dict in INDRA format denoted above.
         :rtype: dict
         """
         n_dict = {'nodes': []}
@@ -367,13 +391,13 @@ class Indra(object):
 
         Other added attributes:
 
-        ``Directed`` - ``True`` if there are one or more
+        ``directed`` - ``True`` if there are one or more
                        forward statements.
 
-        ``Reverse Directed`` - ``True`` if there are one or
+        ``reverse directed`` - ``True`` if there are one or
                        more reverse statements.
 
-        ``Created by Indra`` - Set to ``True``
+        ``edge source`` - Set to ``INDRA``
 
         :param net_cx: Network to update
         :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
@@ -383,7 +407,8 @@ class Indra(object):
         :type target_node_id: int
         :param stmt_list: Statements which are `dict` objects
         :type stmt_list: list
-        :return:
+        :return: Id of edge created
+        :rtype: int
         """
         edge_id = net_cx.create_edge(edge_source=src_node_id,
                                      edge_target=target_node_id,
@@ -422,15 +447,27 @@ class Indra(object):
             for stmt in english_stmt_dict[key]:
                 split_key = key.split(' ')
 
-                if src_is_family is True:
-                    start_offset = 0
+                if stmt['isreversed'] is False:
+                    if src_is_family is True:
+                        start_offset = 0
+                    else:
+                        start_offset = 1
+                    if target_is_family is True:
+                        end_offset = len(split_key)
+                    else:
+                        end_offset = -1
+                    inter_only = ' '.join(split_key[start_offset:end_offset])
                 else:
-                    start_offset = 1
-                if target_is_family is True:
-                    end_offset = len(split_key)
-                else:
-                    end_offset = -1
-                inter_only = ' '.join(split_key[start_offset:end_offset])
+                    if target_is_family is True:
+                        start_offset = 0
+                    else:
+                        start_offset = 1
+                    if src_is_family is True:
+                        end_offset = len(split_key)
+                    else:
+                        end_offset = -1
+                    inter_only = ' '.join(split_key[start_offset:end_offset])
+
                 # url_str = '<a href="' + stmt['db_url_hash'] + '" target="_blank">' + inter_only + '</a>'
                 if stmt['stmt_type'] in Indra.NON_DIRECTIONAL_TYPES:
                     if inter_only not in nodirection:
@@ -459,8 +496,8 @@ class Indra(object):
         net_cx.set_edge_attribute(edge_id, ' ' + src_name_str + ' - ' + tar_name_str,
                                   nodirect_list, type='list_of_string')
 
-        net_cx.set_edge_attribute(edge_id, Indra.CREATED_BY_INDRA,
-                                  True, type='boolean')
+        net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
+                                  'INDRA')
 
         directedval = False
 
@@ -478,7 +515,8 @@ class Indra(object):
                                   type='boolean')
 
         new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
-        net_cx.set_edge_attribute(edge_id, 'PreCollapsedCount', new_evidence_cnt, type='integer')
+        net_cx.set_edge_attribute(edge_id, Indra.PRECOLLAPSED_COUNT,
+                                  new_evidence_cnt, type='integer')
 
         return edge_id
 
@@ -497,7 +535,8 @@ class Indra(object):
             for entry in url_dict[key]:
                 if first is False:
                     url_str += ','
-                url_str += '<a href="' + entry[1] + '">' + str(entry[0]) + '</a>'
+                url_str += '<a href="' + entry[1] +\
+                           '" target="_blank">' + str(entry[0]) + '</a>'
                 first = False
             the_list.append(url_str + ')')
         return the_list
