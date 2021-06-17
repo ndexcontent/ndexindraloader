@@ -361,39 +361,4 @@ format=%(asctime)s %(name)-12s %(levelname)-8s %(message)s""")
         layout_aspect = net.get_opaque_aspect('cartesianLayout')
         self.assertEqual(2, len(layout_aspect))
 
-    def test_add_source_to_existing_edges_sourceval_is_none(self):
-        net = NiceCXNetwork()
-        node_one = net.create_node('node1')
-        node_two = net.create_node('node2')
-        e_one = net.create_edge(edge_source=node_one, edge_target=node_two)
-        e_two = net.create_edge(edge_source=node_two, edge_target=node_one)
-
-        mockargs = MagicMock()
-        mockargs.sourcevalue = None
-        loader = NDExIndraLoader(mockargs)
-        loader._add_source_to_existing_edges(net_cx=net)
-
-        e_attr = net.get_edge_attribute(e_one, Indra.SOURCE)
-        self.assertEqual((None, None), e_attr)
-
-        e_attr = net.get_edge_attribute(e_two, Indra.SOURCE)
-        self.assertEqual((None, None), e_attr)
-
-    def test_add_source_to_existing_edges(self):
-        net = NiceCXNetwork()
-        node_one = net.create_node('node1')
-        node_two = net.create_node('node2')
-        e_one = net.create_edge(edge_source=node_one, edge_target=node_two)
-        e_two = net.create_edge(edge_source=node_two, edge_target=node_one)
-
-        mockargs = MagicMock()
-        mockargs.sourcevalue = 'some source'
-        loader = NDExIndraLoader(mockargs)
-        loader._add_source_to_existing_edges(net_cx=net)
-
-        e_attr = net.get_edge_attribute(e_one, Indra.SOURCE)
-        self.assertEqual('some source', e_attr['v'])
-
-        e_attr = net.get_edge_attribute(e_two, Indra.SOURCE)
-        self.assertEqual('some source', e_attr['v'])
 
