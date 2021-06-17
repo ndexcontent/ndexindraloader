@@ -187,6 +187,20 @@ class Indra(object):
             raise NDExIndraLoaderError('Caught Exception attempting to parse json from '
                                        'query ' + str(e))
 
+    def _add_source_to_existing_edges(self, net_cx=None, source_value=None):
+        """
+        Adds source value if flag is set
+
+        :param net_cx:
+        :return:
+        """
+        if source_value is None:
+            return
+        for edge_id, edge_obj in net_cx.get_edges():
+            e_attr = net_cx.get_edge_attribute(edge_id, Indra.SOURCE)
+            if e_attr == (None, None):
+                net_cx.set_edge_attribute(edge_id, Indra.SOURCE, source_value)
+
     def _remove_original_edges(self, net_cx=None, remove_orig_edges=None):
         """
         Removes original edges from network inplace
@@ -214,7 +228,8 @@ class Indra(object):
                          netprefix='INDRA annotated - ',
                          remove_orig_edges=False,
                          min_evidence_cnt=1,
-                         keep_self_edges=False):
+                         keep_self_edges=False,
+                         source_value=None):
         """
 
         :param net_cx:
@@ -302,6 +317,8 @@ class Indra(object):
                                             desc + '<br/>\n<b>Indra annotation '
                                                    'parameters:</b> ' + str(param_str))
         net_cx.set_name(netprefix + net_cx.get_name())
+
+        self._add_source_to_existing_edges(net_cx=net_cx, source_value=source_value)
 
         return net_cx, result
 

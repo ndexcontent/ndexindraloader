@@ -458,22 +458,6 @@ class NDExIndraLoader(object):
         layout_aspect = self._ndexextra.extract_layout_aspect_from_cx(input_cx_file=tmp_cx_file)
         network.set_opaque_aspect('cartesianLayout', layout_aspect)
 
-    def _add_source_to_existing_edges(self, net_cx=None):
-        """
-        Adds source value if flag is set
-
-        :param net_cx:
-        :return:
-        """
-        if self._args.sourcevalue is None:
-            return
-        src_val = self._args.sourcevalue
-
-        for edge_id, edge_obj in net_cx.get_edges():
-            e_attr = net_cx.get_edge_attribute(edge_id, Indra.SOURCE)
-            if e_attr == (None, None):
-                net_cx.set_edge_attribute(edge_id, Indra.SOURCE, src_val)
-
     def run(self):
         """
         Runs content loading for NDEx Indra Content Loader
@@ -521,9 +505,8 @@ class NDExIndraLoader(object):
 
             net_cx, indra_res = indra.annotate_network(net_cx=net_tuple[0],
                                                        netprefix=self._args.netprefix,
-                                                       indraresult=indra_data)
-
-            self._add_source_to_existing_edges(net_cx=net_cx)
+                                                       indraresult=indra_data,
+                                                       source_value=self._args.sourcevalue)
 
             if self._template is not None:
                 logger.debug('Applying style from file: ' + self._args.style)
