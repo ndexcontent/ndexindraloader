@@ -114,13 +114,13 @@ def remove_edge(net_cx=None, edge_id=None):
 
 class Indra(object):
     """
-    Class to query Indra service and annotate a
+    Class to query INDRA service and annotate a
     :py:class:`~ndex2.nice_cx_network.NiceCXNetwork` network
     """
 
     SUBGRAPH_ENDPOINT = 'https://network.indra.bio/dev/subgraph'
     """
-    Endpoint for Indra subgraph service
+    Endpoint for INDRA subgraph service
     """
 
     NON_DIRECTIONAL_TYPES = ['ActiveForm', 'Association', 'Complex',
@@ -151,7 +151,7 @@ class Indra(object):
         """
         Constructor
 
-        :param subgraph_endpoint: REST endpoint for Indra sub graph service
+        :param subgraph_endpoint: REST endpoint for INDRA sub graph service
         :type subgraph_endpoint: str
         :param timeout: Timeout in seconds for REST web requests
         :type timeout: float or int
@@ -252,7 +252,7 @@ class Indra(object):
             src_name = edge_evidence['edge'][0]['name']
             target_name = edge_evidence['edge'][1]['name']
 
-            # Indra offers other nodes that are not in the original network
+            # INDRA offers other nodes that are not in the original network
             # we are ignoring these for now
             if src_name not in node_name_to_id_dict or \
                 target_name not in node_name_to_id_dict:
@@ -299,7 +299,7 @@ class Indra(object):
                                     target_node_id=t_node_id,
                                     stmt_list=stmt_hash[key])
 
-        net_cx.set_network_attribute('Indra query time in seconds',
+        net_cx.set_network_attribute('INDRA query time in seconds',
                                      values=str(elapsed_time))
 
         desc_obj = net_cx.get_network_attribute('description')
@@ -313,11 +313,15 @@ class Indra(object):
                      'Remove Original Edges': remove_orig_edges}
 
         net_cx.set_network_attribute('description',
-                                     values='<b>Network annotated by '
-                                            'NDExIndraLoader (version: ' +
-                                            ndexindraloader.__version__ + ')</b><br/><br/>\n\n' +
-                                            desc + '<br/>\n<b>Indra annotation '
-                                                   'parameters:</b> ' + str(param_str))
+                                     values=str(desc) +
+                                     '\n\n<b>Additional edges added by ' +
+                                     'NDExIndraLoader (version: ' +
+                                     ndexindraloader.__version__ +
+                                     ')</b> using <a href="https://www.' +
+                                     'indra.bio" target="_blank">INDRA ' +
+                                     'service</a><br/>')
+
+        net_cx.set_network_attribute('INDRA parameters', values=param_str)
         net_cx.set_name(netprefix + net_cx.get_name())
 
         self._add_source_to_existing_edges(net_cx=net_cx, source_value=source_value)
@@ -328,7 +332,7 @@ class Indra(object):
         """
         Queries indra subgraph endpoint
 
-        :param net_cx: network used to build query for Indra
+        :param net_cx: network used to build query for INDRA
         :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
         :param subgraph_endpoint:
         :return: (requests.Response, Request duration in seconds)
@@ -503,16 +507,21 @@ class Indra(object):
                         forward[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
 
         forward_list = self._create_interaction_list(forward)
-        net_cx.set_edge_attribute(edge_id, '  ' + src_name_str + ' => ' + tar_name_str,
+        # used to be the names of the nodes
+        # '  ' + src_name_str + ' => ' + tar_name_str
+        net_cx.set_edge_attribute(edge_id, '  ' + 'SOURCE => TARGET',
                                   forward_list, type='list_of_string')
 
         reverse_list = self._create_interaction_list(reverse)
-        net_cx.set_edge_attribute(edge_id, ' ' + tar_name_str + ' => ' + src_name_str,
+        # used to be the names of the nodes
+        # ' ' + tar_name_str + ' => ' + src_name_str
+        net_cx.set_edge_attribute(edge_id, ' TARGET => SOURCE',
                                   reverse_list, type='list_of_string')
 
         nodirect_list = self._create_interaction_list(nodirection)
-
-        net_cx.set_edge_attribute(edge_id, ' ' + src_name_str + ' - ' + tar_name_str,
+        # used to be the names of the nodes
+        # ' ' + src_name_str + ' - ' + tar_name_str
+        net_cx.set_edge_attribute(edge_id, ' SOURCE - TARGET',
                                   nodirect_list, type='list_of_string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
@@ -577,4 +586,3 @@ class Indra(object):
         if src_node_id <= target_node_id:
             return str(src_node_id) + '_' + str(target_node_id), False
         return str(target_node_id) + '_' + str(src_node_id), True
-

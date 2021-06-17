@@ -11,7 +11,6 @@ import shutil
 import unittest
 from unittest.mock import MagicMock
 from ndex2.nice_cx_network import NiceCXNetwork
-from ndexindraloader.ndexloadindra import NDExIndraLoader
 from ndexindraloader.exceptions import NDExIndraLoaderError
 from ndexindraloader.indra import Indra
 from ndexindraloader import indra
@@ -121,8 +120,8 @@ class TestIndra(unittest.TestCase):
         e_one = net.create_edge(edge_source=node_one, edge_target=node_two)
         e_two = net.create_edge(edge_source=node_two, edge_target=node_one)
 
-        indra = Indra()
-        indra._add_source_to_existing_edges(net_cx=net, source_value=None)
+        indraobj = Indra()
+        indraobj._add_source_to_existing_edges(net_cx=net, source_value=None)
 
         e_attr = net.get_edge_attribute(e_one, Indra.SOURCE)
         self.assertEqual((None, None), e_attr)
@@ -137,13 +136,82 @@ class TestIndra(unittest.TestCase):
         e_one = net.create_edge(edge_source=node_one, edge_target=node_two)
         e_two = net.create_edge(edge_source=node_two, edge_target=node_one)
 
-        indra = Indra()
-        indra._add_source_to_existing_edges(net_cx=net, source_value='some source')
+        indraobj = Indra()
+        indraobj._add_source_to_existing_edges(net_cx=net, source_value='some source')
 
         e_attr = net.get_edge_attribute(e_one, Indra.SOURCE)
         self.assertEqual('some source', e_attr['v'])
 
         e_attr = net.get_edge_attribute(e_two, Indra.SOURCE)
         self.assertEqual('some source', e_attr['v'])
+
+    def test_remove_original_edges(self):
+        net = NiceCXNetwork()
+        node_one = net.create_node('node1')
+        node_two = net.create_node('node2')
+        e_one = net.create_edge(edge_source=node_one, edge_target=node_two)
+        net.set_edge_attribute(e_one, 'foo', values='somedata')
+        net.create_edge(edge_source=node_two, edge_target=node_one)
+        indraobj = Indra()
+        indraobj._remove_original_edges(net_cx=net)
+        self.assertEqual(2, len(net.get_edges()))
+
+        indraobj._remove_original_edges(net_cx=net, remove_orig_edges=False)
+        self.assertEqual(2, len(net.get_edges()))
+
+        indraobj._remove_original_edges(net_cx=net, remove_orig_edges=True)
+        self.assertEqual(0, len(net.get_edges()))
+
+    def test_get_indra_query_dict(self):
+        net = NiceCXNetwork()
+        net.create_node('node1')
+        node_two = net.create_node('node2')
+
+        net.set_node_attribute(node=node_two, attribute_name='member',
+                               values=['hgnc.symbol:gene1',
+                                       'gene2'],
+                               type='list_of_string', overwrite=True)
+
+        indraobj = Indra()
+        res = indraobj._get_indra_query_dict(net_cx=net)
+        self.assertTrue('nodes' in res)
+        self.assertEqual(4, len(res['nodes']))
+
+        node_dict = {}
+        for entry in res['nodes']:
+            node_dict[entry['name']] = entry
+        self.assertEqual({'name': 'node1',
+                          'namespace': '0',
+                          'identifier': '0',
+                          'lookup': None}, node_dict['node1'])
+        self.assertEqual({'name': 'node2',
+                          'namespace': '0',
+                          'identifier': '0',
+                          'lookup': None}, node_dict['node2'])
+        self.assertEqual({'name': 'gene1',
+                          'namespace': '0',
+                          'identifier': '0',
+                          'lookup': None}, node_dict['gene1'])
+        self.assertEqual({'name': 'gene2',
+                          'namespace': '0',
+                          'identifier': '0',
+                          'lookup': None}, node_dict['gene2'])
+
+    def test_get_source_target_key(self):
+        indraobj = Indra()
+        res = indraobj._get_source_target_key(src_node_id=0, target_node_id=1)
+        self.assertEqual(('0_1', False), res)
+
+        res = indraobj._get_source_target_key(src_node_id=0, target_node_id=0)
+        self.assertEqual(('0_0', False), res)
+
+        res = indraobj._get_source_target_key(src_node_id=1, target_node_id=0)
+        self.assertEqual(('0_1', True), res)
+
+
+
+
+
+
 
 
