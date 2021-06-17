@@ -103,8 +103,10 @@ def remove_edge(net_cx=None, edge_id=None):
     :return:
     """
     e_attr_names = set()
-    for edge_attr in net_cx.get_edge_attributes(edge_id):
-        e_attr_names.add(edge_attr['n'])
+    e_attribs = net_cx.get_edge_attributes(edge_id)
+    if e_attribs is not None:
+        for edge_attr in e_attribs:
+            e_attr_names.add(edge_attr['n'])
     for e_attr in e_attr_names:
         net_cx.remove_edge_attribute(edge_id, e_attr)
     net_cx.remove_edge(edge_id)
