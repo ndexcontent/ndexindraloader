@@ -509,19 +509,19 @@ class Indra(object):
         forward_list = self._create_interaction_list(forward)
         # used to be the names of the nodes
         # '  ' + src_name_str + ' => ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, '  ' + 'SOURCE => TARGET',
+        net_cx.set_edge_attribute(edge_id, 'SOURCE => TARGET',
                                   forward_list, type='list_of_string')
 
         reverse_list = self._create_interaction_list(reverse)
         # used to be the names of the nodes
         # ' ' + tar_name_str + ' => ' + src_name_str
-        net_cx.set_edge_attribute(edge_id, ' TARGET => SOURCE',
+        net_cx.set_edge_attribute(edge_id, 'TARGET => SOURCE',
                                   reverse_list, type='list_of_string')
 
         nodirect_list = self._create_interaction_list(nodirection)
         # used to be the names of the nodes
         # ' ' + src_name_str + ' - ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, ' SOURCE - TARGET',
+        net_cx.set_edge_attribute(edge_id, 'SOURCE - TARGET',
                                   nodirect_list, type='list_of_string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,

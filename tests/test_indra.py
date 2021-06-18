@@ -11,6 +11,7 @@ import shutil
 import unittest
 from unittest.mock import MagicMock
 from ndex2.nice_cx_network import NiceCXNetwork
+import ndex2
 from ndexindraloader.exceptions import NDExIndraLoaderError
 from ndexindraloader.indra import Indra
 from ndexindraloader import indra
@@ -19,6 +20,13 @@ from ndexindraloader import indra
 class TestIndra(unittest.TestCase):
     """Tests for `indra` package."""
 
+    EPHB_FORWARDING_CX = os.path.join(os.path.dirname(__file__), 'data',
+                                      '01c81f4a-6192-11e5-8ac5-06603eb7f'
+                                      '303.cx')
+
+    EPHB_FORWARDING_INDRA = os.path.join(os.path.dirname(__file__), 'data',
+                                         '01c81f4a-6192-11e5-8ac5-06603eb7f'
+                                         '303.json')
     def setUp(self):
         """Set up test fixtures, if any."""
 
@@ -207,6 +215,47 @@ class TestIndra(unittest.TestCase):
 
         res = indraobj._get_source_target_key(src_node_id=1, target_node_id=0)
         self.assertEqual(('0_1', True), res)
+
+    def test_annotate_with_ephb_network_and_cached_indra_res(self):
+        net = ndex2.create_nice_cx_from_file(TestIndra.EPHB_FORWARDING_CX)
+
+        with open(TestIndra.EPHB_FORWARDING_INDRA, 'r') as f:
+            indrares = json.load(f)
+
+        indraobj = Indra()
+        res_cx, result = indraobj.annotate_network(net_cx=net,
+                                                   indraresult=indrares,
+                                                   source_value='NCI PID')
+        self.assertIsNotNone(res_cx)
+        self.assertIsNotNone(result)
+        self.assertEqual('INDRA annotated - EPHB forward signaling',
+                         res_cx.get_name())
+        self.assertEqual(42, len(res_cx.get_nodes()))
+        self.assertEqual(503, len(res_cx.get_edges()))
+
+        name_to_id_dict = indra.get_node_name_to_id_dict(res_cx)
+
+        rap1a = name_to_id_dict['RAP1A']
+        rap1b = name_to_id_dict['RAP1B']
+
+        rap_edge = None
+        for edge_id, edge_obj in res_cx.get_edges():
+            if edge_obj['s'] == rap1a and edge_obj['t'] == rap1b:
+                rap_edge = edge_id
+                self.assertEqual('interacts with', edge_obj['i'])
+                break
+
+        self.assertIsNotNone(rap_edge)
+        src_to_tar = res_cx.get_edge_attribute(rap_edge, 'SOURCE => TARGET')
+        self.assertEqual(2, len(src_to_tar['v']))
+
+        tar_to_src = res_cx.get_edge_attribute(rap_edge, 'TARGET => SOURCE')
+        self.assertEqual(2, len(tar_to_src['v']))
+
+        src_tar = res_cx.get_edge_attribute(rap_edge, 'SOURCE - TARGET')
+        self.assertEqual(1, len(src_tar['v']))
+
+
 
 
 
