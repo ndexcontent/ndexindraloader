@@ -230,6 +230,13 @@ class TestIndra(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual('INDRA annotated - EPHB forward signaling',
                          res_cx.get_name())
+
+        desc = res_cx.get_network_attribute('description')['v']
+        self.assertEqual(651, len(desc))
+        self.assertTrue('This pathway is derived from' in desc)
+        self.assertTrue('Additional edges added by NDExIndraLoader' in desc)
+        self.assertTrue('using <a href="https://www.indra.bio" '
+                        'target="_blank">INDRA service</a>' in desc)
         self.assertEqual(42, len(res_cx.get_nodes()))
         self.assertEqual(503, len(res_cx.get_edges()))
 
