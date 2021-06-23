@@ -542,9 +542,9 @@ class Indra(object):
                                   reversedirectedval,
                                   type='boolean')
 
-        new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
-        net_cx.set_edge_attribute(edge_id, Indra.PRECOLLAPSED_COUNT,
-                                  new_evidence_cnt, type='integer')
+        # new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
+        # net_cx.set_edge_attribute(edge_id, Indra.PRECOLLAPSED_COUNT,
+        #                           new_evidence_cnt, type='integer')
 
         return edge_id
 
