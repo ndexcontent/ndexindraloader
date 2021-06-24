@@ -504,6 +504,7 @@ class NDExIndraLoader(object):
                 save_indra_res = False
 
             net_cx, indra_res = indra.annotate_network(net_cx=net_tuple[0],
+                                                       min_evidence_cnt=self._args.minevidencecount,
                                                        netprefix=self._args.netprefix,
                                                        indraresult=indra_data,
                                                        source_value=self._args.sourcevalue)
