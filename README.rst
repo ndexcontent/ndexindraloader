@@ -97,11 +97,11 @@ the following:
 
 3. These lists are renamed as follows:
 
-   * **forward** ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 => GRM4`
+   * **forward** ``SOURCE => TARGET``
 
-   * **reverse** ``TARGET NODE NAME => SOURCE NODE NAME`` aka `GRM4 => GRM7`
+   * **reverse** ``TARGET => SOURCE``
 
-   * **no direction** ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 - GRM4`
+   * **no direction** ``SOURCE - TARGET``
 
    .. note::
 
@@ -114,7 +114,7 @@ the following:
         <INTERACTION> (#, #, #)
 
     There are 46 interaction types and include names like `activates, binds, inhibits`.
-    The ``#`` is evidence count for that statement and it is a clickable html link to INDRA
+    The ``#`` is evidence count for that statement and it is a click able html link to INDRA
     where the evidence for the given statement can be found.
 
     **Example:**
@@ -125,13 +125,12 @@ the following:
 
 5. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
 
-6. ``Created by Indra`` edge attribute set to ``True`` and added to the edge.
+6. ``edge source`` edge attribute set to ``INDRA``.
 
 6. If **forward** list contains entries then ``directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
 
 7. If **reverse** list contains entries then ``reverse directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
 
-8. ``PreCollapsedCount`` edge attribute is added and is the sum of entries in all three lists **forward, reverse, no direction**
 
 Dependencies
 ------------
