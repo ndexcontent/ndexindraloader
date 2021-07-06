@@ -18,11 +18,11 @@ created by `INDRA <https://indra.readthedocs.io>`__ The annotations added are pu
 as a single separate edges (blue edges in image below)
 within this edge are three main attributes:
 
-* For **forward** interactions  ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 => GRM4`
+* For **forward** interactions  ``SOURCE => TARGET``
 
-* For **reverse** interactions ``TARGET NODE NAME => SOURCE NODE NAME`` aka `GRM4 => GRM7`
+* For **reverse** interactions ``TARGET => SOURCE``
 
-* For **no direction** interactions ``SOURCE NODE NAME - TARGET NODE NAME`` aka `GRM7 - GRM4`
+* For **no direction** interactions ``SOURCE - TARGET``
 
 Within the above attributes are interactions and web links back to INDRA containing evidence for the
 interaction. In addition, there are boolean edge attributes denoting if the **forward** list
