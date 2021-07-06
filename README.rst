@@ -22,7 +22,7 @@ within this edge are three main attributes:
 
 * For **reverse** interactions ``TARGET NODE NAME => SOURCE NODE NAME`` aka `GRM4 => GRM7`
 
-* For **no direction** interactions ``SOURCE NODE NAME => TARGET NODE NAME`` aka `GRM7 - GRM4`
+* For **no direction** interactions ``SOURCE NODE NAME - TARGET NODE NAME`` aka `GRM7 - GRM4`
 
 Within the above attributes are interactions and weblinks back to INDRA containing evidence for the
 interaction. In addition, there are boolean edge attributes denoting if the **forward** list
