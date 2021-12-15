@@ -6,6 +6,7 @@ import sys
 import json
 import uuid
 import logging
+import configparser
 from logging import config
 from tqdm import tqdm
 import networkx as nx
@@ -464,7 +465,10 @@ class NDExIndraLoader(object):
 
         :return:
         """
-        self._parse_config()
+        try:
+            self._parse_config()
+        except configparser.NoSectionError as ne:
+            raise NDExIndraLoaderError('No section found in config file. Be sure to set --profile correctly: ' + str(ne))
 
         cachedir = self._create_indracache()
         outdir = self._create_saveasfile_dir()
