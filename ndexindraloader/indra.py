@@ -118,7 +118,7 @@ class Indra(object):
     :py:class:`~ndex2.nice_cx_network.NiceCXNetwork` network
     """
 
-    SUBGRAPH_ENDPOINT = 'https://network.indra.bio/dev/subgraph'
+    SUBGRAPH_ENDPOINT = 'https://network.indra.bio/api/subgraph'
     """
     Endpoint for INDRA subgraph service
     """
