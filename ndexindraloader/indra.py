@@ -520,7 +520,7 @@ class Indra(object):
                                                   indra_url='https://db.indra.bio/search')
         net_cx.set_edge_attribute(edge_id, 'relationships', 'All (' +
                                   all_url + ')<br/>' +
-                                  '<br/>'.join(full_list), type='string')
+                                  '<br/>'.join(full_list) + '<br/>', type='string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
                                   'INDRA')
