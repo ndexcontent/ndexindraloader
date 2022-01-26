@@ -131,15 +131,25 @@ class Indra(object):
     Endpoint for INDRA subgraph service
     """
 
+    STATEMENT_URL = 'https://db.indra.bio/statements'
+    """
+    URL Prefix for INDRA statements website
+    """
+
     NON_DIRECTIONAL_TYPES = ['ActiveForm', 'Association', 'Complex',
                              'Migration']
     """
     These statement types aka 'stmt_type' are non directional
     """
 
-    SOURCE = 'edge source'
+    SOURCE = 'Edge Source'
     """
     Name of edge attribute to denote source of edge
+    """
+
+    RELATIONSHIPS = 'Relationships (Evidences)'
+    """
+    Name of edge attribute containing relationships between two nodes
     """
 
     DIRECTED = '__directed'
@@ -152,7 +162,7 @@ class Indra(object):
         Name of edge attribute to denote that edge is directed in reverse
     """
 
-    PRECOLLAPSED_COUNT = 'pre-collapsed count'
+    RAW_EVIDENCE_COUNT = '__raw_evidence_count'
 
     DEFAULT_BROWSER_TARGET = 'INDRA_Evidence'
     """
@@ -440,37 +450,20 @@ class Indra(object):
                            stmt_list=None):
         """
         Given a list of statements `stmt_list` this method adds a single
-        edge to the network `net_cx`. This is done by first merging all
-        the statements with matching english statements and
-        adding them to one of three list attributes
-        (forward statements aka source to target,
-        reverse statements target to source,
-        and no direction statements) on the edge. The merged
-        statement has the interaction followed by parenthesis
-        that contain numbers corresponding to number of sources
-        for each statement. For web enabled network viewers
-        these numbers are links to INDRA database showing the
-        evidence.
-
-        The forward statement attribute name is:
-        ``SOURCE NODE NAME => TARGET NODE NAME``
-
-        The reverse statement attribute name is:
-        ``TARGET NODE NAME => SOURCE NODE NAME``
-
-        The no direction statement attribute name is:
-        ``SOURCE NODE NAME - TARGET NODE NAME``
-
+        edge to the network `net_cx`. This is done by first
+        removing statements with duplicate hash values and adding
+        them to a single attribute ``Relationships (Evidences)`` with a link
+        back to INDRA showing evidence
 
         Other added attributes:
 
-        ``directed`` - ``True`` if there are one or more
+        ``__directed`` - ``True`` if there are one or more
                        forward statements.
 
-        ``reverse directed`` - ``True`` if there are one or
+        ``__reverse directed`` - ``True`` if there are one or
                        more reverse statements.
 
-        ``edge source`` - Set to ``INDRA``
+        ``Edge source`` - Set to ``INDRA``
 
         :param net_cx: Network to update
         :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
@@ -505,7 +498,9 @@ class Indra(object):
 
             full_list.append(stmt['english'] + '(' +
                              self._create_indra_evidence_url(evidence_cnt=stmt['evidence_count'],
-                                                             indra_url=stmt['db_url_hash']) +
+                                                             thesubject=stmt['source_node'],
+                                                             theobject=stmt['target_node'],
+                                                             thetype=stmt['stmt_type']) +
                              ')')
             try:
                 total_evidence_cnt += int(stmt['evidence_count'])
@@ -515,10 +510,11 @@ class Indra(object):
                                str(stmt['evidence_count']) +
                                ' full statement: ' + str(stmt))
             # nodirection[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
+        all_url = self._create_indra_all_evidence_url(evidence_cnt=total_evidence_cnt,
+                                                      theagent0=stmt['source_node'],
+                                                      theagent1=stmt['target_node'])
 
-        all_url = self._create_indra_evidence_url(evidence_cnt=total_evidence_cnt,
-                                                  indra_url='https://db.indra.bio/search')
-        net_cx.set_edge_attribute(edge_id, 'relationships', 'All (' +
+        net_cx.set_edge_attribute(edge_id, Indra.RELATIONSHIPS, 'All (' +
                                   all_url + ')<br/>' +
                                   '<br/>'.join(full_list) + '<br/>', type='string')
 
@@ -540,19 +536,47 @@ class Indra(object):
                                   reversedirectedval,
                                   type='boolean')
 
-        # new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
-        # net_cx.set_edge_attribute(edge_id, Indra.PRECOLLAPSED_COUNT,
-        #                           new_evidence_cnt, type='integer')
+        # Total count of evidences found. Storing in special edge attribute
+        net_cx.set_edge_attribute(edge_id, Indra.RAW_EVIDENCE_COUNT,
+                                  total_evidence_cnt, type='integer')
 
         return edge_id
 
-    def _create_indra_evidence_url(self, evidence_cnt=0, indra_url=None):
+    def _create_indra_evidence_url(self, evidence_cnt=0,
+                                   thesubject=None,
+                                   theobject=None,
+                                   thetype=None):
         """
 
         :param evidence_cnt:
-        :param indra_url:
+        :param thesubject:
+        :param theobject:
+        :param thetype:
         :return:
         """
+        indra_url = Indra.STATEMENT_URL + '/from_agents?subject=' +\
+            thesubject + '&object=' + theobject + '&type=' + thetype +\
+            '&format=html'
+        # &expand_all=true is not yet working so leaving it off
+        return '<a href="' + str(indra_url) +\
+               '" target="' + self._browser_target + '">' +\
+               str(evidence_cnt) + '</a>'
+
+    def _create_indra_all_evidence_url(self, evidence_cnt=0, theagent0=None,
+                                       theagent1=None):
+        """
+
+        :param self:
+        :param evidence_cnt:
+        :param theagent0:
+        :param theagent1:
+        :return:
+        """
+        indra_url = Indra.STATEMENT_URL + '/from_agents?agent0=' +\
+            theagent0 + '&agent1=' + theagent1 +\
+            '&format=html'
+        # &expand_all=true is not yet working so leaving it off
+
         return '<a href="' + str(indra_url) +\
                '" target="' + self._browser_target + '">' +\
                str(evidence_cnt) + '</a>'
