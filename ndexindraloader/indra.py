@@ -49,6 +49,7 @@ def get_node_name_to_id_dict(net_cx=None):
     """
 
     :param net_cx:
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :return:
     :rtype: dict
     """
@@ -67,6 +68,7 @@ def is_family_node(net_cx=None, node_id=None):
     """
 
     :param net_cx:
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :param node_id:
     :return:
     """
@@ -85,9 +87,13 @@ def is_family_node(net_cx=None, node_id=None):
 
 def get_node_id_to_name_dict(net_cx=None):
     """
+    Gets dict from network where key is node id and value
+    is the name of node
 
-    :param net_cx:
-    :return:
+    :param net_cx: Network to build dict from
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+    :return: map of node id to node names
+    :rtype: dict
     """
     node_dict = {}
     for node_id, node_obj in net_cx.get_nodes():
@@ -98,7 +104,9 @@ def get_node_id_to_name_dict(net_cx=None):
 def remove_edge(net_cx=None, edge_id=None):
     """
     Removes edge attributes and its edge
-    :param net_cx:
+
+    :param net_cx: Network to remove edge from
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :param edge_id:
     :return:
     """
@@ -134,20 +142,26 @@ class Indra(object):
     Name of edge attribute to denote source of edge
     """
 
-    DIRECTED = 'directed'
+    DIRECTED = '__directed'
     """
     Name of edge attribute to denote that edge is directed
     """
 
-    REVERSE_DIRECTED = 'reverse directed'
+    REVERSE_DIRECTED = '__reverse directed'
     """
         Name of edge attribute to denote that edge is directed in reverse
     """
 
     PRECOLLAPSED_COUNT = 'pre-collapsed count'
 
+    DEFAULT_BROWSER_TARGET = 'INDRA_Evidence'
+    """
+    Default target value set for html links
+    """
+
     def __init__(self, subgraph_endpoint=None,
-                 timeout=600):
+                 timeout=600,
+                 default_browser_target=DEFAULT_BROWSER_TARGET):
         """
         Constructor
 
@@ -155,9 +169,20 @@ class Indra(object):
         :type subgraph_endpoint: str
         :param timeout: Timeout in seconds for REST web requests
         :type timeout: float or int
+        :param default_browser_target: Value to set in ```target``` attribute for
+                                       html links. If _blank then a new tab will
+                                       be opened every time a user clicks a link.
+                                       See https://www.w3schools.com/tags/att_a_target.asp
+                                       for more information
+        :type default_browser_target: str
         """
         self._timeout = timeout
         self._subgraph_endpoint = Indra.SUBGRAPH_ENDPOINT
+
+        self._browser_target = default_browser_target
+
+        if self._browser_target is None:
+            self._browser_target = Indra.DEFAULT_BROWSER_TARGET
 
         if subgraph_endpoint is not None:
             self._subgraph_endpoint = subgraph_endpoint
@@ -194,6 +219,7 @@ class Indra(object):
         Adds source value if flag is set
 
         :param net_cx:
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
         :return:
         """
         if source_value is None:
@@ -235,6 +261,7 @@ class Indra(object):
         """
 
         :param net_cx:
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
         :param maxnetworksize:
         :return:
         """
@@ -385,6 +412,29 @@ class Indra(object):
                                             'lookup': None})
         return n_dict
 
+    def _get_unique_statments(self, stmt_list=None):
+        """
+        Iterates through statements and returns a list of
+        unique statements. Duplicates are ones with identical 'stmt_hash' values
+
+        :param stmt_list:
+        :type stmt_list: list
+        :return unique statements
+        :rtype: list
+        """
+        stmt_hash_set = set()
+        unique_stmt_list = []
+        for stmt in stmt_list:
+            if stmt['stmt_hash'] in stmt_hash_set:
+                continue
+            stmt_hash_set.add(stmt['stmt_hash'])
+            unique_stmt_list.append(stmt)
+        return unique_stmt_list
+
+    def _remove_period_from_statements(self, stmt_list=None):
+        for stmt in stmt_list:
+            stmt['english'] = re.sub('\.$', '', stmt['english'])
+
     def _single_edge_adder(self, net_cx=None, src_node_id=None,
                            target_node_id=None,
                            stmt_list=None):
@@ -437,103 +487,51 @@ class Indra(object):
                                      edge_target=target_node_id,
                                      edge_interaction='interacts with')
 
-        english_stmt_dict = {}
-        src_node_names = set()
-        target_node_names = set()
-        stmt_hash_set = set()
-        for stmt in stmt_list:
-            if stmt['stmt_hash'] in stmt_hash_set:
-                continue
-            stmt_hash_set.add(stmt['stmt_hash'])
-            clean_english = re.sub('\.$', '', stmt['english'])
-            if clean_english not in english_stmt_dict:
-                english_stmt_dict[clean_english] = []
-            english_stmt_dict[clean_english].append(stmt)
+        unique_stmt_list = self._get_unique_statments(stmt_list=stmt_list)
 
-            if stmt['isreversed'] is True:
-                target_node_names.add(stmt['source_node'])
-                src_node_names.add(stmt['target_node'])
-            else:
-                src_node_names.add(stmt['source_node'])
-                target_node_names.add(stmt['target_node'])
+        self._remove_period_from_statements(stmt_list=unique_stmt_list)
 
-        src_is_family = is_family_node(net_cx, src_node_id)
-        target_is_family = is_family_node(net_cx, target_node_id)
-        forward = {}
-        reverse = {}
-        nodirection = {}
+        full_list = []
+        forward_count = 0
+        reverse_count = 0
+        total_evidence_cnt = 0
+        for stmt in unique_stmt_list:
 
-        src_name_str = ', '.join(src_node_names)
-        tar_name_str = ', '.join(target_node_names)
-
-        for key in english_stmt_dict:
-            for stmt in english_stmt_dict[key]:
-                split_key = key.split(' ')
-
-                if stmt['isreversed'] is False:
-                    if src_is_family is True:
-                        start_offset = 0
-                    else:
-                        start_offset = 1
-                    if target_is_family is True:
-                        end_offset = len(split_key)
-                    else:
-                        end_offset = -1
-                    inter_only = ' '.join(split_key[start_offset:end_offset])
+            if stmt['stmt_type'] not in Indra.NON_DIRECTIONAL_TYPES:
+                if stmt['isreversed'] is True:
+                    reverse_count += 1
                 else:
-                    if target_is_family is True:
-                        start_offset = 0
-                    else:
-                        start_offset = 1
-                    if src_is_family is True:
-                        end_offset = len(split_key)
-                    else:
-                        end_offset = -1
-                    inter_only = ' '.join(split_key[start_offset:end_offset])
+                    forward_count += 1
 
-                # url_str = '<a href="' + stmt['db_url_hash'] + '" target="_blank">' + inter_only + '</a>'
-                if stmt['stmt_type'] in Indra.NON_DIRECTIONAL_TYPES:
-                    if inter_only not in nodirection:
-                        nodirection[inter_only] = []
-                    nodirection[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
-                else:
-                    if stmt['isreversed'] is True:
-                        if inter_only not in reverse:
-                            reverse[inter_only] = []
-                        reverse[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
-                    else:
-                        if inter_only not in forward:
-                            forward[inter_only] = []
-                        forward[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
+            full_list.append(stmt['english'] + '(' +
+                             self._create_indra_evidence_url(evidence_cnt=stmt['evidence_count'],
+                                                             indra_url=stmt['db_url_hash']) +
+                             ')')
+            try:
+                total_evidence_cnt += int(stmt['evidence_count'])
+            except ValueError as ve:
+                logger.warning('Expected a number for evidence_count in this '
+                               'statement, but got: ' +
+                               str(stmt['evidence_count']) +
+                               ' full statement: ' + str(stmt))
+            # nodirection[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
 
-        forward_list = self._create_interaction_list(forward)
-        # used to be the names of the nodes
-        # '  ' + src_name_str + ' => ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, 'SOURCE => TARGET',
-                                  forward_list, type='list_of_string')
-
-        reverse_list = self._create_interaction_list(reverse)
-        # used to be the names of the nodes
-        # ' ' + tar_name_str + ' => ' + src_name_str
-        net_cx.set_edge_attribute(edge_id, 'TARGET => SOURCE',
-                                  reverse_list, type='list_of_string')
-
-        nodirect_list = self._create_interaction_list(nodirection)
-        # used to be the names of the nodes
-        # ' ' + src_name_str + ' - ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, 'SOURCE - TARGET',
-                                  nodirect_list, type='list_of_string')
+        all_url = self._create_indra_evidence_url(evidence_cnt=total_evidence_cnt,
+                                                  indra_url='https://db.indra.bio/search')
+        net_cx.set_edge_attribute(edge_id, 'relationships', 'All (' +
+                                  all_url + ')<br/>' +
+                                  '<br/>'.join(full_list), type='string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
                                   'INDRA')
 
         directedval = False
 
-        if len(forward_list) > 0:
+        if forward_count > 0:
             directedval = True
 
         reversedirectedval = False
-        if len(reverse_list) > 0:
+        if reverse_count > 0:
             reversedirectedval = True
 
         net_cx.set_edge_attribute(edge_id, Indra.DIRECTED, directedval,
@@ -548,6 +546,17 @@ class Indra(object):
 
         return edge_id
 
+    def _create_indra_evidence_url(self, evidence_cnt=0, indra_url=None):
+        """
+
+        :param evidence_cnt:
+        :param indra_url:
+        :return:
+        """
+        return '<a href="' + str(indra_url) +\
+               '" target="' + self._browser_target + '">' +\
+               str(evidence_cnt) + '</a>'
+
     def _create_interaction_list(self, url_dict):
         """
 
@@ -555,6 +564,7 @@ class Indra(object):
         :return:
         """
         the_list = []
+        logger.debug('url_dict: ' + str(url_dict))
         sorted_keys = sorted(url_dict.keys())
         for key in sorted_keys:
             url_str = key + '('
