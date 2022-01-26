@@ -468,7 +468,11 @@ class NDExIndraLoader(object):
         try:
             self._parse_config()
         except configparser.NoSectionError as ne:
-            raise NDExIndraLoaderError('No section found in config file. Be sure to set --profile correctly: ' + str(ne))
+            if self._args.savetoserver is True:
+                raise NDExIndraLoaderError('No section found in config file '
+                                           'needed for --savetoserver flag. '
+                                           'Be sure to set --profile '
+                                           'correctly: ' + str(ne))
 
         cachedir = self._create_indracache()
         outdir = self._create_saveasfile_dir()
