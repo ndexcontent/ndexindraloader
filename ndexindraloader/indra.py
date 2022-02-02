@@ -561,8 +561,8 @@ class Indra(object):
         full_list = self._sort_evidence_tuple_list(full_list_tuple)
         net_cx.set_edge_attribute(edge_id, Indra.RELATIONSHIPS,
                                   'All Evidences (' +
-                                  all_url + ')<br/>' +
-                                  '<br/>'.join(full_list) + '<br/>',
+                                  all_url + ')<ul><li/>' +
+                                  '<li/>'.join(full_list) + '</ul>',
                                   type='string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
