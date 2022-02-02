@@ -449,6 +449,36 @@ class Indra(object):
             unique_stmt_list.append(stmt)
         return unique_stmt_list
 
+    def _merge_matching_statements(self, stmt_list=None):
+        """
+        Iterates through the statements and those that have matching
+        english statements are merged into one statement with evidence
+        counts added
+
+        :param stmt_list:
+        :type stmt_list: list
+        :return unique statements
+        :rtype: list
+        """
+        stmt_english_set = set()
+        stmt_english_dict = {}
+        for stmt in stmt_list:
+            if stmt['english'] not in stmt_english_dict:
+                stmt_english_dict[stmt['english']] = []
+            stmt_english_dict[stmt['english']].append(stmt)
+
+        unique_stmt_list = []
+        for key in stmt_english_dict.keys():
+            stmt_list = stmt_english_dict[key]
+            total_evidence_count = 0
+            for stmt in stmt_list:
+                total_evidence_count += stmt['evidence_count']
+            stmt_list[0]['evidence_count'] = total_evidence_count
+            unique_stmt_list.append(stmt_list[0])
+
+        return unique_stmt_list
+
+
     def _remove_period_from_statements(self, stmt_list=None):
         for stmt in stmt_list:
             stmt['english'] = re.sub('\.$', '', stmt['english'])
@@ -488,9 +518,11 @@ class Indra(object):
                                      edge_target=target_node_id,
                                      edge_interaction='interacts with')
 
-        unique_stmt_list = self._get_unique_statments(stmt_list=stmt_list)
+        unique_byhash_stmt_list = self._get_unique_statments(stmt_list=stmt_list)
 
-        self._remove_period_from_statements(stmt_list=unique_stmt_list)
+        self._remove_period_from_statements(stmt_list=unique_byhash_stmt_list)
+
+        unique_stmt_list = self._merge_matching_statements(stmt_list=unique_byhash_stmt_list)
 
         full_list_tuple = []
         forward_count = 0
