@@ -657,8 +657,7 @@ class Indra(object):
         """
         indra_url = Indra.STATEMENT_URL + '/from_agents?subject=' +\
             thesubject + '&object=' + theobject + '&type=' + thetype +\
-            '&format=html'
-        # TODO add &expand_all=true once it is working on INDRA website
+            '&format=html&expand_all=true'
 
         return '<a href="' + str(indra_url) +\
                '" target="' + self._browser_target + '">' +\
@@ -676,8 +675,7 @@ class Indra(object):
         """
         indra_url = Indra.STATEMENT_URL + '/from_agents?agent0=' +\
             theagent0 + '&agent1=' + theagent1 +\
-            '&format=html'
-        # TODO add &expand_all=true once it is working on INDRA website
+            '&format=html&expand_all=true'
 
         return '<a href="' + str(indra_url) +\
                '" target="' + self._browser_target + '">' +\
