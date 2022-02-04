@@ -126,6 +126,7 @@ total evidence count in parenthesis.
 
 7. If ``__reverse_directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **TARGET** and **SOURCE**
 
+8. ``__relationship_score`` is set to log base 2 of total evidence count for edge
 
 Dependencies
 ------------
