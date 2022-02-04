@@ -106,6 +106,8 @@ def _parse_arguments(desc, args):
                         help='If set, adds source edge attribute with value'
                              'passed in to existing edges of network')
     parser.add_argument('--style',
+                        default=os.path.join(os.path.dirname(ndexindraloader.indra.__file__),
+                                             'style.cx'),
                         help='If CX file, then style from that file is '
                              'applied to network.')
     parser.add_argument('--tmpdir', default='.',
