@@ -106,6 +106,8 @@ def _parse_arguments(desc, args):
                         help='If set, adds source edge attribute with value'
                              'passed in to existing edges of network')
     parser.add_argument('--style',
+                        default=os.path.join(os.path.dirname(ndexindraloader.indra.__file__),
+                                             'style.cx'),
                         help='If CX file, then style from that file is '
                              'applied to network.')
     parser.add_argument('--tmpdir', default='.',
@@ -468,7 +470,11 @@ class NDExIndraLoader(object):
         try:
             self._parse_config()
         except configparser.NoSectionError as ne:
-            raise NDExIndraLoaderError('No section found in config file. Be sure to set --profile correctly: ' + str(ne))
+            if self._args.savetoserver is True:
+                raise NDExIndraLoaderError('No section found in config file '
+                                           'needed for --savetoserver flag. '
+                                           'Be sure to set --profile '
+                                           'correctly: ' + str(ne))
 
         cachedir = self._create_indracache()
         outdir = self._create_saveasfile_dir()

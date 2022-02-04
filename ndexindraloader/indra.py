@@ -4,7 +4,7 @@ import time
 import re
 import logging
 import requests
-
+import math
 import ndexindraloader
 from .exceptions import NDExIndraLoaderError
 
@@ -49,6 +49,7 @@ def get_node_name_to_id_dict(net_cx=None):
     """
 
     :param net_cx:
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :return:
     :rtype: dict
     """
@@ -67,6 +68,7 @@ def is_family_node(net_cx=None, node_id=None):
     """
 
     :param net_cx:
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :param node_id:
     :return:
     """
@@ -85,9 +87,13 @@ def is_family_node(net_cx=None, node_id=None):
 
 def get_node_id_to_name_dict(net_cx=None):
     """
+    Gets dict from network where key is node id and value
+    is the name of node
 
-    :param net_cx:
-    :return:
+    :param net_cx: Network to build dict from
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+    :return: map of node id to node names
+    :rtype: dict
     """
     node_dict = {}
     for node_id, node_obj in net_cx.get_nodes():
@@ -98,7 +104,9 @@ def get_node_id_to_name_dict(net_cx=None):
 def remove_edge(net_cx=None, edge_id=None):
     """
     Removes edge attributes and its edge
-    :param net_cx:
+
+    :param net_cx: Network to remove edge from
+    :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
     :param edge_id:
     :return:
     """
@@ -123,31 +131,51 @@ class Indra(object):
     Endpoint for INDRA subgraph service
     """
 
+    STATEMENT_URL = 'https://db.indra.bio/statements'
+    """
+    URL Prefix for INDRA statements website
+    """
+
     NON_DIRECTIONAL_TYPES = ['ActiveForm', 'Association', 'Complex',
                              'Migration']
     """
     These statement types aka 'stmt_type' are non directional
     """
 
-    SOURCE = 'edge source'
+    SOURCE = '__edge_source'
     """
     Name of edge attribute to denote source of edge
     """
 
-    DIRECTED = 'directed'
+    RELATIONSHIPS = 'Relationships'
+    """
+    Name of edge attribute containing relationships between two nodes
+    """
+
+    DIRECTED = '__directed'
     """
     Name of edge attribute to denote that edge is directed
     """
 
-    REVERSE_DIRECTED = 'reverse directed'
+    REVERSE_DIRECTED = '__reverse_directed'
     """
         Name of edge attribute to denote that edge is directed in reverse
     """
 
-    PRECOLLAPSED_COUNT = 'pre-collapsed count'
+    RELATIONSHIP_SCORE = '__relationship_score'
+    """
+    Name of edge attribute that holds the natural log of evidence
+    count from INDRA for the edge
+    """
+
+    DEFAULT_BROWSER_TARGET = 'INDRA_Evidence'
+    """
+    Default target value set for html links
+    """
 
     def __init__(self, subgraph_endpoint=None,
-                 timeout=600):
+                 timeout=600,
+                 default_browser_target=DEFAULT_BROWSER_TARGET):
         """
         Constructor
 
@@ -155,9 +183,20 @@ class Indra(object):
         :type subgraph_endpoint: str
         :param timeout: Timeout in seconds for REST web requests
         :type timeout: float or int
+        :param default_browser_target: Value to set in ```target``` attribute for
+                                       html links. If _blank then a new tab will
+                                       be opened every time a user clicks a link.
+                                       See https://www.w3schools.com/tags/att_a_target.asp
+                                       for more information
+        :type default_browser_target: str
         """
         self._timeout = timeout
         self._subgraph_endpoint = Indra.SUBGRAPH_ENDPOINT
+
+        self._browser_target = default_browser_target
+
+        if self._browser_target is None:
+            self._browser_target = Indra.DEFAULT_BROWSER_TARGET
 
         if subgraph_endpoint is not None:
             self._subgraph_endpoint = subgraph_endpoint
@@ -194,6 +233,7 @@ class Indra(object):
         Adds source value if flag is set
 
         :param net_cx:
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
         :return:
         """
         if source_value is None:
@@ -235,10 +275,14 @@ class Indra(object):
         """
 
         :param net_cx:
-        :param maxnetworksize:
+        :param indraresult:
+        :param netprefix:
+        :param remove_orig_edges:
+        :param min_evidence_cnt:
+        :param keep_self_edges:
+        :param source_value:
         :return:
         """
-
         result, elapsed_time = self._get_indra_result(net_cx=net_cx,
                                                       indraresult=indraresult)
 
@@ -254,8 +298,7 @@ class Indra(object):
 
             # INDRA offers other nodes that are not in the original network
             # we are ignoring these for now
-            if src_name not in node_name_to_id_dict or \
-                target_name not in node_name_to_id_dict:
+            if src_name not in node_name_to_id_dict or target_name not in node_name_to_id_dict:
                 continue
 
             src_node_id = node_name_to_id_dict[src_name]
@@ -299,7 +342,7 @@ class Indra(object):
                                     target_node_id=t_node_id,
                                     stmt_list=stmt_hash[key])
 
-        net_cx.set_network_attribute('INDRA query time in seconds',
+        net_cx.set_network_attribute('__INDRA query time in seconds',
                                      values=str(elapsed_time))
 
         desc_obj = net_cx.get_network_attribute('description')
@@ -318,7 +361,9 @@ class Indra(object):
                                      'NDExIndraLoader (version: ' +
                                      ndexindraloader.__version__ +
                                      ')</b> using <a href="https://www.' +
-                                     'indra.bio" target="_blank">INDRA ' +
+                                     'indra.bio" target="' +
+                                     Indra.DEFAULT_BROWSER_TARGET +
+                                     '">INDRA ' +
                                      'service</a><br/>')
 
         net_cx.set_network_attribute('INDRA parameters', values=param_str)
@@ -385,42 +430,78 @@ class Indra(object):
                                             'lookup': None})
         return n_dict
 
+    def _get_unique_statments(self, stmt_list=None):
+        """
+        Iterates through statements and returns a list of
+        unique statements. Duplicates are ones with identical 'stmt_hash' values
+
+        :param stmt_list:
+        :type stmt_list: list
+        :return unique statements
+        :rtype: list
+        """
+        stmt_hash_set = set()
+        unique_stmt_list = []
+        for stmt in stmt_list:
+            if stmt['stmt_hash'] in stmt_hash_set:
+                continue
+            stmt_hash_set.add(stmt['stmt_hash'])
+            unique_stmt_list.append(stmt)
+        return unique_stmt_list
+
+    def _merge_matching_statements(self, stmt_list=None):
+        """
+        Iterates through the statements and those that have matching
+        english statements are merged into one statement with evidence
+        counts added
+
+        :param stmt_list:
+        :type stmt_list: list
+        :return unique statements
+        :rtype: list
+        """
+        stmt_english_set = set()
+        stmt_english_dict = {}
+        for stmt in stmt_list:
+            if stmt['english'] not in stmt_english_dict:
+                stmt_english_dict[stmt['english']] = []
+            stmt_english_dict[stmt['english']].append(stmt)
+
+        unique_stmt_list = []
+        for key in stmt_english_dict.keys():
+            stmt_list = stmt_english_dict[key]
+            total_evidence_count = 0
+            for stmt in stmt_list:
+                total_evidence_count += stmt['evidence_count']
+            stmt_list[0]['evidence_count'] = total_evidence_count
+            unique_stmt_list.append(stmt_list[0])
+
+        return unique_stmt_list
+
+
+    def _remove_period_from_statements(self, stmt_list=None):
+        for stmt in stmt_list:
+            stmt['english'] = re.sub('\.$', '', stmt['english'])
+
     def _single_edge_adder(self, net_cx=None, src_node_id=None,
                            target_node_id=None,
                            stmt_list=None):
         """
         Given a list of statements `stmt_list` this method adds a single
-        edge to the network `net_cx`. This is done by first merging all
-        the statements with matching english statements and
-        adding them to one of three list attributes
-        (forward statements aka source to target,
-        reverse statements target to source,
-        and no direction statements) on the edge. The merged
-        statement has the interaction followed by parenthesis
-        that contain numbers corresponding to number of sources
-        for each statement. For web enabled network viewers
-        these numbers are links to INDRA database showing the
-        evidence.
-
-        The forward statement attribute name is:
-        ``SOURCE NODE NAME => TARGET NODE NAME``
-
-        The reverse statement attribute name is:
-        ``TARGET NODE NAME => SOURCE NODE NAME``
-
-        The no direction statement attribute name is:
-        ``SOURCE NODE NAME - TARGET NODE NAME``
-
+        edge to the network `net_cx`. This is done by first
+        removing statements with duplicate hash values and adding
+        them to a single attribute ``Relationships`` with a link
+        back to INDRA showing evidence
 
         Other added attributes:
 
-        ``directed`` - ``True`` if there are one or more
+        ``__directed`` - ``True`` if there are one or more
                        forward statements.
 
-        ``reverse directed`` - ``True`` if there are one or
+        ``__reverse_directed`` - ``True`` if there are one or
                        more reverse statements.
 
-        ``edge source`` - Set to ``INDRA``
+        ``__edge_source`` - Set to ``INDRA``
 
         :param net_cx: Network to update
         :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
@@ -437,103 +518,67 @@ class Indra(object):
                                      edge_target=target_node_id,
                                      edge_interaction='interacts with')
 
-        english_stmt_dict = {}
-        src_node_names = set()
-        target_node_names = set()
-        stmt_hash_set = set()
-        for stmt in stmt_list:
-            if stmt['stmt_hash'] in stmt_hash_set:
-                continue
-            stmt_hash_set.add(stmt['stmt_hash'])
-            clean_english = re.sub('\.$', '', stmt['english'])
-            if clean_english not in english_stmt_dict:
-                english_stmt_dict[clean_english] = []
-            english_stmt_dict[clean_english].append(stmt)
+        unique_byhash_stmt_list = self._get_unique_statments(stmt_list=stmt_list)
 
-            if stmt['isreversed'] is True:
-                target_node_names.add(stmt['source_node'])
-                src_node_names.add(stmt['target_node'])
-            else:
-                src_node_names.add(stmt['source_node'])
-                target_node_names.add(stmt['target_node'])
+        self._remove_period_from_statements(stmt_list=unique_byhash_stmt_list)
 
-        src_is_family = is_family_node(net_cx, src_node_id)
-        target_is_family = is_family_node(net_cx, target_node_id)
-        forward = {}
-        reverse = {}
-        nodirection = {}
+        unique_stmt_list = self._merge_matching_statements(stmt_list=unique_byhash_stmt_list)
 
-        src_name_str = ', '.join(src_node_names)
-        tar_name_str = ', '.join(target_node_names)
+        full_list_tuple = []
+        forward_count = 0
+        reverse_count = 0
+        total_evidence_cnt = 0
+        for stmt in unique_stmt_list:
 
-        for key in english_stmt_dict:
-            for stmt in english_stmt_dict[key]:
-                split_key = key.split(' ')
-
-                if stmt['isreversed'] is False:
-                    if src_is_family is True:
-                        start_offset = 0
-                    else:
-                        start_offset = 1
-                    if target_is_family is True:
-                        end_offset = len(split_key)
-                    else:
-                        end_offset = -1
-                    inter_only = ' '.join(split_key[start_offset:end_offset])
+            if stmt['stmt_type'] not in Indra.NON_DIRECTIONAL_TYPES:
+                if stmt['isreversed'] is True:
+                    reverse_count += 1
                 else:
-                    if target_is_family is True:
-                        start_offset = 0
-                    else:
-                        start_offset = 1
-                    if src_is_family is True:
-                        end_offset = len(split_key)
-                    else:
-                        end_offset = -1
-                    inter_only = ' '.join(split_key[start_offset:end_offset])
+                    forward_count += 1
 
-                # url_str = '<a href="' + stmt['db_url_hash'] + '" target="_blank">' + inter_only + '</a>'
-                if stmt['stmt_type'] in Indra.NON_DIRECTIONAL_TYPES:
-                    if inter_only not in nodirection:
-                        nodirection[inter_only] = []
-                    nodirection[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
-                else:
-                    if stmt['isreversed'] is True:
-                        if inter_only not in reverse:
-                            reverse[inter_only] = []
-                        reverse[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
-                    else:
-                        if inter_only not in forward:
-                            forward[inter_only] = []
-                        forward[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
+            # add tuple containing statement and evidence count
+            # which will be used to sort the list later
+            full_list_tuple.append((stmt['english'] + '(' +
+                                    self._create_indra_evidence_url(evidence_cnt=stmt['evidence_count'],
+                                                                    thesubject=stmt['source_node'],
+                                                                    theobject=stmt['target_node'],
+                                                                    thetype=stmt['stmt_type']) +
+                                   ')', int(stmt['evidence_count'])))
+            try:
+                total_evidence_cnt += int(stmt['evidence_count'])
+            except ValueError as ve:
+                logger.warning('Expected a number for evidence_count in this '
+                               'statement, but got: ' +
+                               str(stmt['evidence_count']) +
+                               ' full statement: ' + str(stmt))
+            # nodirection[inter_only].append((stmt['evidence_count'], stmt['db_url_hash']))
+        all_url = self._create_indra_all_evidence_url(evidence_cnt=total_evidence_cnt,
+                                                      theagent0=stmt['source_node'],
+                                                      theagent1=stmt['target_node'])
 
-        forward_list = self._create_interaction_list(forward)
-        # used to be the names of the nodes
-        # '  ' + src_name_str + ' => ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, 'SOURCE => TARGET',
-                                  forward_list, type='list_of_string')
-
-        reverse_list = self._create_interaction_list(reverse)
-        # used to be the names of the nodes
-        # ' ' + tar_name_str + ' => ' + src_name_str
-        net_cx.set_edge_attribute(edge_id, 'TARGET => SOURCE',
-                                  reverse_list, type='list_of_string')
-
-        nodirect_list = self._create_interaction_list(nodirection)
-        # used to be the names of the nodes
-        # ' ' + src_name_str + ' - ' + tar_name_str
-        net_cx.set_edge_attribute(edge_id, 'SOURCE - TARGET',
-                                  nodirect_list, type='list_of_string')
+        # sort the list in descending order based on evidence count
+        # element 1 of tuple
+        full_list = self._sort_evidence_tuple_list(full_list_tuple)
+        net_cx.set_edge_attribute(edge_id, Indra.RELATIONSHIPS,
+                                  'All Evidences (' +
+                                  all_url + ')<ul><li/>' +
+                                  '<li/>'.join(full_list) + '</ul>',
+                                  type='string')
 
         net_cx.set_edge_attribute(edge_id, Indra.SOURCE,
                                   'INDRA')
 
+        net_cx.set_edge_attribute(edge_id, Indra.RELATIONSHIP_SCORE,
+                                  math.log(float(total_evidence_cnt)),
+                                  type='double')
+
         directedval = False
 
-        if len(forward_list) > 0:
+        if forward_count > 0:
             directedval = True
 
         reversedirectedval = False
-        if len(reverse_list) > 0:
+        if reverse_count > 0:
             reversedirectedval = True
 
         net_cx.set_edge_attribute(edge_id, Indra.DIRECTED, directedval,
@@ -541,12 +586,100 @@ class Indra(object):
         net_cx.set_edge_attribute(edge_id, Indra.REVERSE_DIRECTED,
                                   reversedirectedval,
                                   type='boolean')
-
-        # new_evidence_cnt = len(forward_list) + len(reverse_list) + len(nodirection)
-        # net_cx.set_edge_attribute(edge_id, Indra.PRECOLLAPSED_COUNT,
-        #                           new_evidence_cnt, type='integer')
-
         return edge_id
+
+    def _sort_evidence_tuple_list(self, list_of_tuples):
+        """
+        Takes a list of tuples, splitting them into set by ``PROTEIN1``
+        For each of those groups the tuples are sorted in descending order
+        with highest evidence count first. Those groups are then put into
+        another list and ordered by the highest evidence count found in
+        each group. The statements are then extracted in order from this
+        list and returned to the caller
+
+        :param list_of_tuples: containing tuples
+               ``(PROTEIN1 INTERACTION PROTEIN, EVIDENCE COUNT)``
+        :type list_of_tuples: list
+        :return:
+        """
+        # create a dict where protein is key and value is list of
+        # statements with that protein at beginning
+        protein_dict = {}
+        for a_tuple in list_of_tuples:
+            protein = re.sub(' .*', '', a_tuple[0])
+            if protein not in protein_dict:
+                protein_dict[protein] = []
+            protein_dict[protein].append(a_tuple)
+        logger.debug('Protein dict: ' + str(protein_dict))
+
+        sorted_tuple_list = []
+        # sort each group by evidence count and add to a new tuple
+        for protein_key in protein_dict.keys():
+            # sort the statements by evidence count in descending order
+            protein_dict[protein_key].sort(key=lambda y: y[1], reverse=True)
+
+            # get the maximum evidence count (assume it is second element of first tuple)
+            max_evidence_cnt_for_grp = protein_dict[protein_key][0][1]
+
+            # replace protein_dict[protein_key] with just list of statements since we no longer
+            # need the evidence count cause we already sorted by that value
+            protein_dict[protein_key] = [a_tuple[0] for a_tuple in protein_dict[protein_key]]
+
+            # make a new list of tuples where 1st element is max evidence count and second is the list
+            # of statements ie (EVIDENCE COUNT, [STATEMENTS....])
+            sorted_tuple_list.append((max_evidence_cnt_for_grp, protein_dict[protein_key]))
+
+        # sort [(EVIDENCE COUNT, [STATEMENTS....])] by  EVIDENCE COUNT
+        sorted_tuple_list.sort(key=lambda y: y[0], reverse=True)
+        logger.debug('sorted tuple list after sort: ' + str(sorted_tuple_list))
+
+        # create list of lists of just statements ie [[STATEMENTS...]]
+        list_o_list = [a_tuple[1] for a_tuple in sorted_tuple_list]
+        logger.debug('list_o_list: ' + str(list_o_list))
+
+        # Flatten list of lists into single list
+        final_list = []
+        for list_ele in list_o_list:
+            final_list.extend(list_ele)
+        return final_list
+
+    def _create_indra_evidence_url(self, evidence_cnt=0,
+                                   thesubject=None,
+                                   theobject=None,
+                                   thetype=None):
+        """
+
+        :param evidence_cnt:
+        :param thesubject:
+        :param theobject:
+        :param thetype:
+        :return:
+        """
+        indra_url = Indra.STATEMENT_URL + '/from_agents?subject=' +\
+            thesubject + '&object=' + theobject + '&type=' + thetype +\
+            '&format=html&expand_all=true'
+
+        return '<a href="' + str(indra_url) +\
+               '" target="' + self._browser_target + '">' +\
+               str(evidence_cnt) + '</a>'
+
+    def _create_indra_all_evidence_url(self, evidence_cnt=0, theagent0=None,
+                                       theagent1=None):
+        """
+
+        :param self:
+        :param evidence_cnt:
+        :param theagent0:
+        :param theagent1:
+        :return:
+        """
+        indra_url = Indra.STATEMENT_URL + '/from_agents?agent0=' +\
+            theagent0 + '&agent1=' + theagent1 +\
+            '&format=html&expand_all=true'
+
+        return '<a href="' + str(indra_url) +\
+               '" target="' + self._browser_target + '">' +\
+               str(evidence_cnt) + '</a>'
 
     def _create_interaction_list(self, url_dict):
         """
@@ -555,6 +688,7 @@ class Indra(object):
         :return:
         """
         the_list = []
+        logger.debug('url_dict: ' + str(url_dict))
         sorted_keys = sorted(url_dict.keys())
         for key in sorted_keys:
             url_str = key + '('
