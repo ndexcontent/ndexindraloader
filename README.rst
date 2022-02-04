@@ -14,19 +14,21 @@ NDEx Indra Content Loader
         :alt: Documentation Status
 
 This loader annotates existing networks with `subgraph service <https://network.indra.bio/dev/subgraph>`__
-created by `INDRA <https://indra.readthedocs.io>`__ The annotations added are put on
-as a single separate edges (blue edges in image below)
-within this edge are three main attributes:
+created by `INDRA <https://indra.readthedocs.io>`__
 
-* For **forward** interactions  ``SOURCE => TARGET``
+The annotations are added as single separate edges (blue edges in image below)
+with the following attributes
 
-* For **reverse** interactions ``TARGET => SOURCE``
+* ``__directed`` Boolean (``true|false``) denotes if edge is directed
 
-* For **no direction** interactions ``SOURCE - TARGET``
+* ``__reverse_directed`` Boolean (``true|false``) denotes if edge is reverse directed
 
-Within the above attributes are interactions and web links back to INDRA containing evidence for the
-interaction. In addition, there are boolean edge attributes denoting if the **forward** list
-contains entries, named ``directed``, or if the **reverse** list contains entries ``reverse directed``
+* ``__edge_source`` Source of edge annotation. ``INDRA`` is added if Indra annotated edge
+
+* ``__relationship_score`` Natural log of total evidence count on edge
+
+* ``Relationships`` Human readable list of interaction statements along with evidence count. The evidence counts are links back to INDRA database
+
 
 .. image:: https://github.com/ndexcontent/ndexindraloader/blob/main/docs/images/example.png
         :alt: Image of network annotated by INDRA subgraph service
@@ -42,7 +44,7 @@ Technical details
 
 .. note::
 
-    Due to limitations with the service only networks with 100 nodes or less can be analyzed
+    Due to limitations with the service only networks with few hundred nodes or less can be analyzed
 
 
 .. note::
@@ -91,45 +93,38 @@ the following:
 
 
 
-2. For each "edge", the statements above are grouped by their "english" phrase
-   and put into one of three lists: forward (meaning source X target), reverse (meaning target X source), and
-   no direction (if interaction was one of the following: ``ActiveForm, Association, Complex, Migration``)
+2. For each "edge", the statements above are grouped by their "english" phrase. If multiple statements have matching
+``stmt_hash`` values only one is kept.
 
-3. These lists are renamed as follows:
 
-   * **forward** ``SOURCE => TARGET``
-
-   * **reverse** ``TARGET => SOURCE``
-
-   * **no direction** ``SOURCE - TARGET``
-
-   .. note::
-
-        This approach results in a lot of unique node attributes.
-
-4. The grouped statements are added as values to the above lists in the following format:
+3. The grouped statements are sorted by evidence count and added to ``Relationships`` edge attribute in the following format:
 
     .. code-block::
 
-        <INTERACTION> (#, #, #)
+        <SOURCE> <INTERACTION> <TARGET> (#)
 
     There are 46 interaction types and include names like `activates, binds, inhibits`.
     The ``#`` is evidence count for that statement and it is a click able html link to INDRA
     where the evidence for the given statement can be found.
 
+In addition, an ``All Evidences (#)`` entry is prepended with a link to all the statements on INDRA in the
+total evidence count in parenthesis.
+
     **Example:**
 
     .. code-block::
 
-        activates(3,2), inhibits(1)
+        All Evidences (10)
+        * FZD2 binds WNT3A(7)
+        * WNT3A activates FZD2(3)
 
-5. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
+4. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
 
-6. ``edge source`` edge attribute set to ``INDRA``.
+5. ``__edge_source`` edge attribute set to ``INDRA``.
 
-6. If **forward** list contains entries then ``directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
+6. If ``__directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **SOURCE** and **TARGET**
 
-7. If **reverse** list contains entries then ``reverse directed`` edge attribute is added and set to ``True`` otherwise set as ``False``
+7. If ``__reverse_directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **TARGET** and **SOURCE**
 
 
 Dependencies
@@ -139,6 +134,10 @@ Dependencies
 * `ndexutil <https://pypi.org/project/ndexutil>`__
 * `requests <https://pypi.org/project/requests>`__
 * `tqdm <https://pypi.org/project/tqdm>`__
+
+.. note::
+
+   A running instance of Cytoscape is also required if Cytoscape layout is specified via ``--layout`` flag
 
 Compatibility
 -------------
