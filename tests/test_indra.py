@@ -232,11 +232,11 @@ class TestIndra(unittest.TestCase):
                          res_cx.get_name())
 
         desc = res_cx.get_network_attribute('description')['v']
-        self.assertEqual(651, len(desc))
+        self.assertEqual(659, len(desc))
         self.assertTrue('This pathway is derived from' in desc)
         self.assertTrue('Additional edges added by NDExIndraLoader' in desc)
         self.assertTrue('using <a href="https://www.indra.bio" '
-                        'target="_blank">INDRA service</a>' in desc)
+                        'target="INDRA_Evidence">INDRA service</a>' in desc)
         self.assertEqual(42, len(res_cx.get_nodes()))
         self.assertEqual(503, len(res_cx.get_edges()))
 
@@ -253,14 +253,12 @@ class TestIndra(unittest.TestCase):
                 break
 
         self.assertIsNotNone(rap_edge)
-        src_to_tar = res_cx.get_edge_attribute(rap_edge, 'SOURCE => TARGET')
-        self.assertEqual(2, len(src_to_tar['v']))
+        src_to_tar = res_cx.get_edge_attribute(rap_edge, Indra.RELATIONSHIPS)
+        self.assertEqual(1065, len(src_to_tar['v']))
+        self.assertTrue('All Evidences (' in src_to_tar['v'])
+        self.assertTrue('RAP1A binds RAP1B(' in src_to_tar['v'])
+        self.assertTrue('RAP1A inhibits RAP1B(' in src_to_tar['v'])
 
-        tar_to_src = res_cx.get_edge_attribute(rap_edge, 'TARGET => SOURCE')
-        self.assertEqual(2, len(tar_to_src['v']))
-
-        src_tar = res_cx.get_edge_attribute(rap_edge, 'SOURCE - TARGET')
-        self.assertEqual(1, len(src_tar['v']))
 
 
 
