@@ -478,7 +478,6 @@ class Indra(object):
 
         return unique_stmt_list
 
-
     def _remove_period_from_statements(self, stmt_list=None):
         for stmt in stmt_list:
             stmt['english'] = re.sub('\.$', '', stmt['english'])
