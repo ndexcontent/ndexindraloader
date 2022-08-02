@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import time
+import copy
 import re
 import logging
 import requests
@@ -120,6 +121,215 @@ def remove_edge(net_cx=None, edge_id=None):
     net_cx.remove_edge(edge_id)
 
 
+class StatementFilter(object):
+    """
+    Base class for classes that filter INDRA statements
+    """
+    def __init__(self):
+        """
+        Constructor
+        """
+        pass
+
+    def get_description(self):
+        """
+        Subclasses should implement
+        :return:
+        """
+        raise NotImplementedError('subclasses should implement')
+
+    def filter(self, edge_evidence):
+        """
+        Subclasses should implement
+
+        :param edge_evidence:
+        :type edge_evidence: dict
+        :return: Copy of edge_evidence with filtered statements removed and str report
+                 in a tuple (evidence, report)
+        :rtype: tuple
+        """
+        raise NotImplementedError('subclasses should implement')
+
+
+class IncorrectStatementFilter(StatementFilter):
+    """
+    Filters out statements that are incorrect going of this definition:
+
+    .. code-block:: python
+
+        Filter out curated incorrect statements
+        This requires first fetching the set of curations from the INDRA DB REST API and
+        then applying a filter that removes incorrect statements based on those curations
+
+        [{'curator': 'd6587e2bdde71e07',
+          'date': 'Thu, 29 Nov 2018 18:00:08 GMT',
+          'ev_json': None,
+          'id': 196,
+          'pa_hash': -31337470416928082,
+          'pa_json': None,
+          'source': 'DB REST API',
+          'source_hash': -6988195563234119487,
+          'tag': 'grounding',
+          'text': '[ROS] -> MESH:D017382'},
+         {'curator': 'd6587e2bdde71e07',
+          'date': 'Tue, 04 Dec 2018 15:28:35 GMT',
+          'ev_json': None,
+          'id': 197,
+          'pa_hash': 10615109383390843,
+          'pa_json': None,
+          'source': 'DB REST API',
+          'source_hash': 5357869769322938035,
+          'tag': 'grounding',
+          'text': '[erbB] -> FPLX:ERBB'}]
+
+        The important point here is to look at the "pa_hash" which corresponds
+        to an INDRA Statement hash (that may be tied to one of the edges in
+        your network). Note that each network edge can have multiple INDRA
+        Statements associated with it and not all of them may be incorrect,
+        one has to apply these curations at the level of individual Statements,
+        before generating NDEx network edges.
+
+        Another important point is to take into account the "tag" for each
+        curation. For this, we need to note that each curation applies to a
+        specific evidence for a statement, and not the statement as a whole.
+        A "correct" tag means that the given evidence correctly supports the
+        given statement.
+        A "hypothesis" tag means that the evidence text is phrased as a
+        hypothesis that, if taken as an assertion, supports the statement.
+        Since this is often a minor issue, we tend to include these as correct.
+        An "act_vs_amt" tag means that a statement about catalytic activation
+        was interpreted as an amount regulation or vice versa. For the kind
+        of networks we are building here, we consider this a minor issue and
+        therefore include these as correct.
+        Every other tag (e.g., "grounding", "wrong_relation", "polarity",
+        etc.) mean that the evidence doesn't correctly support the Statement.
+        Given these tags, we use the following logic to filter statements:
+        If a statement only has incorrect curations and no correct curations,
+        it is overall incorrect and needs to be filtered out
+        If a statement has any correct curations even if it also has some
+        incorrect curations, it is overall correct and should be kept
+        All other statements can be kept
+    """
+    def __init__(self, curationlist=None):
+        """
+        Constructor
+
+        :param curationlist: list of curations from INDRA
+        :type list:
+        """
+        super(StatementFilter, self).__init__()
+        self._curations = {}
+        for entry in curationlist:
+            pa_hash = entry['pa_hash']
+            if pa_hash not in self._curations:
+                self._curations[pa_hash] = []
+            self._curations[pa_hash].append(entry)
+
+
+    def get_description(self):
+        """
+        Outputs description of what this filter does
+
+        :return: Summary of what this filter does
+        :rtype: str
+        """
+        return 'IncorrectStatementFilter: Iterates through evidence ' \
+               'statements and removes ' \
+               'any where source and target are the same'
+
+    def _is_at_least_one_curation_correct(self, curations=None):
+        """
+        check all the curations matching that hash
+        remove statement if all curations do not have
+        the following tags: correct, hypothesis, act_vs_amt
+        but keep if at least one does
+
+        :param curations:
+        :return:
+        """
+        for curation in curations:
+            if curation['tag'] in ['correct', 'hypothesis', 'act_vs_amt']:
+                return True
+        return False
+
+    def filter(self, edge_evidence):
+        """
+        Removes incorrect statements
+
+        :param edge_evidence:
+        :return:
+        """
+        filtered_e = copy.deepcopy(edge_evidence)
+        report = ''
+        for stmtkey in filtered_e['stmts'].keys():
+            if stmtkey not in self._curations:
+                continue
+            curations = self._curations[stmtkey]
+            if self._is_at_least_one_curation_correct(curations=curations) is False:
+                report += 'No good curations for ' + str(filtered_e['stmts'][stmtkey]) + ' removing \n'
+                del filtered_e['stmts'][stmtkey]
+                continue
+
+        return filtered_e, report
+
+
+class SelfLoopStatementFilter(StatementFilter):
+    """
+    Filters out statements that are self loops, or
+    where source and target are the same
+
+    """
+    def __init__(self):
+        """
+        Constructor
+        """
+        super(StatementFilter, self).__init__()
+
+    def get_description(self):
+        """
+        Outputs description of what this filter does
+
+        :return: Summary of what this filter does
+        :rtype: str
+        """
+        return 'SelfLoopStatementFilter: Iterates through evidence ' \
+               'statements and removes ' \
+               'any where source and target are the same'
+
+    def filter(self, edge_evidence):
+        """
+        Removes self loop statements
+        following this rule from INDRA filtering guide:
+
+        .. code-block:: python
+
+            Filter out self-loops i.e., Statements all of whose participants are a single gene
+               * These are not very interesting and are often the result of reading errors.
+
+
+        :param edge_evidence:
+        :return:
+        """
+        filtered_e = copy.deepcopy(edge_evidence)
+        entity_name_set = set()
+        report = ''
+        for entity in edge_evidence['edge']:
+            entity_name_set.add(entity['name'])
+
+        if len(entity_name_set) <= 1:
+            report += '1 or less sources/targets nodes in edge: ' + str(entity) + '\n'
+            filtered_e['stmts'] = {}
+
+        for stmtkey in filtered_e['stmts'].keys():
+            stmt = filtered_e['stmts'][stmtkey]
+            english_clean = re.sub('\.$', '', stmt['english'])
+            split_english = english_clean.split()
+            if split_english[0] == split_english[1]:
+                report += split_english[0] + ' source matches target. Removing statement' + '\n'
+                del filtered_e['stmts'][stmtkey]
+        return filtered_e, report
+
+
 class Indra(object):
     """
     Class to query INDRA service and annotate a
@@ -175,7 +385,8 @@ class Indra(object):
 
     def __init__(self, subgraph_endpoint=None,
                  timeout=600,
-                 default_browser_target=DEFAULT_BROWSER_TARGET):
+                 default_browser_target=DEFAULT_BROWSER_TARGET,
+                 stmtfilters=None):
         """
         Constructor
 
@@ -200,6 +411,9 @@ class Indra(object):
 
         if subgraph_endpoint is not None:
             self._subgraph_endpoint = subgraph_endpoint
+
+        self._stmtfilters = stmtfilters
+
 
     def _get_indra_result(self, net_cx=None, indraresult=None):
         """
@@ -266,11 +480,89 @@ class Indra(object):
             remove_edge(net_cx=net_cx, edge_id=e)
         del edges_to_remove
 
+    def _filter_statements(self, edge_evidence=None):
+        """
+        Filters single **edge_evidence** parameter passed in following these rules:
+
+        * Filter out curated incorrect statements
+
+
+
+        Example Edge evidence:
+
+        .. code-block:: python
+
+            {'edge': [{'name': 'SDC4',
+                       'namespace': 'HGNC',
+                       'identifier': '10661',
+                       'lookup': 'https://identifiers.org/hgnc:10661',
+                       'sign': None},
+                      {'name': 'FGFR1',
+                       'namespace': 'HGNC',
+                       'identifier': '3688',
+                       'lookup': 'https://identifiers.org/hgnc:3688',
+                       'sign': None}],
+              'stmts': {'-18861998898188963': {'stmt_type': 'Complex',
+                                               'evidence_count': 1,
+                                               'stmt_hash': -18861998898188963,
+                                               'source_counts': {'sparser': 1},
+                                               'belief': 0.65,
+                                               'curated': False,
+                                               'english': 'SDC4 binds FGFR1.',
+                                               'weight': 0.4307829160924542,
+                                               'residue': None,
+                                               'position': None,
+                                               'initial_sign': None,
+                                               'db_url_hash': 'https://db.indra.bio/statements/from_hash/-18861998898188963?format=html&ev_limit=10'},
+                         '-5411687829567042': {'stmt_type': 'Complex',
+                                               'evidence_count': 2,
+                                               'stmt_hash': -5411687829567042,
+                                               'source_counts': {'sparser': 2},
+                                               'belief': 0.86,
+                                               'curated': False,
+                                               'english': 'SDC4 binds FGFR1.',
+                                               'weight': 0.15082288973458366,
+                                               'residue': None, 'position': None,
+                                               'initial_sign': None,
+                                               'db_url_hash': 'https://db.indra.bio/statements/from_hash/-5411687829567042?format=html&ev_limit=10'},
+                         '15679352643449856': {'stmt_type': 'Activation',
+                                               'evidence_count': 1,
+                                               'stmt_hash': 15679352643449856,
+                                               'source_counts': {'medscan': 1},
+                                               'belief': 0.65,
+                                               'curated': False,
+                                               'english': 'SDC4 activates FGFR1.',
+                                               'weight': 0.4307829160924542,
+                                               'residue': None,
+                                               'position': None,
+                                               'initial_sign': None,
+                                               'db_url_hash': 'https://db.indra.bio/statements/from_hash/15679352643449856?format=html&ev_limit=10'}},
+                 'belief': 0.98285,
+                 'weight': 0.01729876457832946,
+                 'db_url_edge': 'https://db.indra.bio/statements/from_agents?subject=10661@HGNC&object=3688@HGNC&ev_limit=10&format=html',
+                 'url_by_type': {'Complex': 'https://db.indra.bio/statements/from_agents?subject=10661@HGNC&object=3688@HGNC&ev_limit=10&format=html&type=Complex',
+                                 'Activation': 'https://db.indra.bio/statements/from_agents?subject=10661@HGNC&object=3688@HGNC&ev_limit=10&format=html&type=Activation'}
+            }
+
+
+        :param net_cx: Network (not sure if i need this)
+        :type net_cx: :py:class:`~ndex2.nice_cx_network.NiceCXNetwork`
+        :param edge_evidence: Raw edge evidence as dict from INDRA
+        :type edge_evidence: dict
+        :param curations: Curation data from INDRA
+        :type curations: dict
+        :return:
+        """
+        if self._stmtfilters is None or len(self._stmtfilters) == 0:
+            return edge_evidence
+        filtered_e = edge_evidence
+        for filter in self._stmtfilters:
+            filtered_e = filter.filter(filtered_e)
+        return filtered_e
+
     def annotate_network(self, net_cx=None, indraresult=None,
                          netprefix='INDRA annotated - ',
                          remove_orig_edges=False,
-                         min_evidence_cnt=1,
-                         keep_self_edges=False,
                          source_value=None):
         """
 
@@ -292,7 +584,10 @@ class Indra(object):
                                     remove_orig_edges=remove_orig_edges)
 
         node_name_to_id_dict = get_node_name_to_id_dict(net_cx=net_cx)
-        for edge_evidence in result['edges']:
+
+        for raw_edge_evidence in result['edges']:
+            edge_evidence = self._filter_statements(raw_edge_evidence)
+
             src_name = edge_evidence['edge'][0]['name']
             target_name = edge_evidence['edge'][1]['name']
 
@@ -306,13 +601,6 @@ class Indra(object):
 
             for stmtkey in edge_evidence['stmts'].keys():
                 stmt = edge_evidence['stmts'][stmtkey]
-                if stmt['evidence_count'] < min_evidence_cnt:
-                    continue
-
-                # Skip self edges
-                if src_node_id == target_node_id and keep_self_edges is False:
-                    continue
-
                 stmt['source_node'] = src_name
                 stmt['source_node_id'] = src_node_id
                 stmt['target_node'] = target_name
@@ -351,9 +639,7 @@ class Indra(object):
         else:
             desc = desc_obj['v']
 
-        param_str = {'Keep Self Edges': keep_self_edges,
-                     'Min Evidence Count': min_evidence_cnt,
-                     'Remove Original Edges': remove_orig_edges}
+        param_str = {'Remove Original Edges': remove_orig_edges}
 
         net_cx.set_network_attribute('description',
                                      values=str(desc) +

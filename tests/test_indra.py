@@ -15,6 +15,8 @@ import ndex2
 from ndexindraloader.exceptions import NDExIndraLoaderError
 from ndexindraloader.indra import Indra
 from ndexindraloader import indra
+from ndexindraloader.indra import SelfLoopStatementFilter
+from ndexindraloader.indra import IncorrectStatementFilter
 
 
 class TestIndra(unittest.TestCase):
@@ -258,6 +260,33 @@ class TestIndra(unittest.TestCase):
         self.assertTrue('All Evidences (' in src_to_tar['v'])
         self.assertTrue('RAP1A binds RAP1B(' in src_to_tar['v'])
         self.assertTrue('RAP1A inhibits RAP1B(' in src_to_tar['v'])
+
+    def get_jsonfiles(self):
+        jsondir = '/Users/churas/src/ndexindraloader/8.1/cache'
+        jsonfiles = []
+        for entry in os.listdir(jsondir):
+            if not entry.endswith('.json'):
+                continue
+            fp = os.path.join(jsondir, entry)
+            if not os.path.isfile(fp):
+                continue
+            jsonfiles.append(fp)
+        return jsonfiles
+
+    def test_selfloop(self):
+        print('Test selfloop')
+        with open('/Users/churas/src/ndexindraloader/8.1.22.allcurations.json', 'r') as f:
+            curations = json.load(f)
+        filter = IncorrectStatementFilter(curationlist=curations)
+        for jfile in self.get_jsonfiles():
+            with open(jfile, 'r') as f:
+                data = json.load(f)
+                for edge_evidence in data['edges']:
+                    res, report = filter.filter(edge_evidence)
+                    if len(report) > 0:
+                        print(report)
+        print('End of selfloop test')
+
 
 
 
