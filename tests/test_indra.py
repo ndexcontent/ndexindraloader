@@ -17,6 +17,8 @@ from ndexindraloader.indra import Indra
 from ndexindraloader import indra
 from ndexindraloader.indra import SelfLoopStatementFilter
 from ndexindraloader.indra import IncorrectStatementFilter
+from ndexindraloader.indra import SingleReadingStatementFilter
+from ndexindraloader.indra import SparserComplexStatementFilter
 
 
 class TestIndra(unittest.TestCase):
@@ -275,9 +277,8 @@ class TestIndra(unittest.TestCase):
 
     def test_selfloop(self):
         print('Test selfloop')
-        with open('/Users/churas/src/ndexindraloader/8.1.22.allcurations.json', 'r') as f:
-            curations = json.load(f)
-        filter = IncorrectStatementFilter(curationlist=curations)
+
+        filter = SparserComplexStatementFilter()
         for jfile in self.get_jsonfiles():
             with open(jfile, 'r') as f:
                 data = json.load(f)

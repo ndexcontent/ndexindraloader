@@ -151,6 +151,135 @@ class StatementFilter(object):
         raise NotImplementedError('subclasses should implement')
 
 
+class SparserComplexStatementFilter(StatementFilter):
+    """
+    Filter out Complexes that only have evidence from Sparser
+    The rationale is that the Sparser reading system tends to
+    pick up spurious complexes, and if Sparser is the only one
+    having reported a certain Complex, without evidence from
+    any other source, then its quality is likely to be low.
+
+
+    """
+    def __init__(self):
+        """
+        Constructor
+
+        """
+        super(StatementFilter, self).__init__()
+
+    def get_description(self):
+        """
+        Outputs description of what this filter does
+
+        :return: Summary of what this filter does
+        :rtype: str
+        """
+        return 'SparserComplexStatementFilter: Removes statements for ' \
+               'Complexes with only sparser ' \
+               'as source of evidence'
+
+    def filter(self, edge_evidence):
+        """
+        Removes incorrect statements
+
+        :param edge_evidence:
+        :return:
+        """
+        filtered_e = copy.deepcopy(edge_evidence)
+        report = ''
+        source_set = set()
+        stmts_to_remove = set()
+        for stmtkey in filtered_e['stmts'].keys():
+            stmt = filtered_e['stmts'][stmtkey]
+            # we only filter if type is Complex
+            if stmt['stmt_type'] != 'Complex':
+                continue
+
+            # we have more then one source, no filtering
+            # needed
+            if len(stmt['source_counts'].keys()) > 1:
+                continue
+
+            source = list(stmt['source_counts'].keys())[0]
+            # if the source is sparser regardless of evidence
+            # count, toss it
+            if source == 'sparser':
+                stmts_to_remove.add(stmtkey)
+
+        for stmtkey in stmts_to_remove:
+            del filtered_e['stmts'][stmtkey]
+        removed_cnt = len(stmts_to_remove)
+
+        if removed_cnt > 0:
+            report += 'Removed ' + str(removed_cnt) + ' sparser complex statements\n'
+        return filtered_e, report
+
+
+class SingleReadingStatementFilter(StatementFilter):
+    """
+    Filter out statements that have a single evidence from a reading system
+    The rationale is that if there is a single evidence but from a curated
+    resource (e.g., Pathway Commons or SIGNOR), it’s fine to keep it. But
+    if it’s from a single reading system, its error rate is fairly high.
+    Once we have more than one evidence, even if it’s from a single reading
+    system, the precision is in the 75-80% range.
+
+    """
+    def __init__(self):
+        """
+        Constructor
+
+        :param curationlist: list of curations from INDRA
+        :type list:
+        """
+        super(StatementFilter, self).__init__()
+
+    def get_description(self):
+        """
+        Outputs description of what this filter does
+
+        :return: Summary of what this filter does
+        :rtype: str
+        """
+        return 'SingleReadingStatementFilter: Removes statements with only one evidence ' \
+               'that originated ' \
+               'from only a single reading system'
+
+    def filter(self, edge_evidence):
+        """
+        Removes incorrect statements
+
+        :param edge_evidence:
+        :return:
+        """
+        filtered_e = copy.deepcopy(edge_evidence)
+        report = ''
+        source_set = set()
+        stmts_to_remove = set()
+        for stmtkey in filtered_e['stmts'].keys():
+            stmt = filtered_e['stmts'][stmtkey]
+            # we have more then one source we are good
+            if len(stmt['source_counts'].keys()) > 1:
+                continue
+
+            source = list(stmt['source_counts'].keys())[0]
+            # if the source is a reading source and only 1 piece
+            # of evidence. Toss it
+            if source in ['eidos', 'trips', 'reach', 'sparser',
+                          'medscan', 'rlimsp', 'isi']:
+                if stmt['source_counts'][source] <= 1:
+                    stmts_to_remove.add(stmtkey)
+
+        for stmtkey in stmts_to_remove:
+            del filtered_e['stmts'][stmtkey]
+        removed_cnt = len(stmts_to_remove)
+
+        if removed_cnt > 0:
+            report += 'Removed ' + str(removed_cnt) + ' statements that lacked good curations\n'
+        return filtered_e, report
+
+
 class IncorrectStatementFilter(StatementFilter):
     """
     Filters out statements that are incorrect going of this definition:
@@ -225,7 +354,6 @@ class IncorrectStatementFilter(StatementFilter):
                 self._curations[pa_hash] = []
             self._curations[pa_hash].append(entry)
 
-
     def get_description(self):
         """
         Outputs description of what this filter does
@@ -233,9 +361,8 @@ class IncorrectStatementFilter(StatementFilter):
         :return: Summary of what this filter does
         :rtype: str
         """
-        return 'IncorrectStatementFilter: Iterates through evidence ' \
-               'statements and removes ' \
-               'any where source and target are the same'
+        return 'IncorrectStatementFilter: Removes statements that lack ' \
+               'good curations'
 
     def _is_at_least_one_curation_correct(self, curations=None):
         """
@@ -261,15 +388,21 @@ class IncorrectStatementFilter(StatementFilter):
         """
         filtered_e = copy.deepcopy(edge_evidence)
         report = ''
+        stmts_to_remove = set()
         for stmtkey in filtered_e['stmts'].keys():
-            if stmtkey not in self._curations:
+            intstmtkey = int(stmtkey)
+            if intstmtkey not in self._curations:
                 continue
-            curations = self._curations[stmtkey]
+            curations = self._curations[intstmtkey]
             if self._is_at_least_one_curation_correct(curations=curations) is False:
-                report += 'No good curations for ' + str(filtered_e['stmts'][stmtkey]) + ' removing \n'
-                del filtered_e['stmts'][stmtkey]
+                stmts_to_remove.add(stmtkey)
                 continue
 
+        for stmtkey in stmts_to_remove:
+            del filtered_e['stmts'][stmtkey]
+        removed_cnt = len(stmts_to_remove)
+        if removed_cnt > 0:
+            report += 'Removed ' + str(removed_cnt) + ' statements that lacked good curations\n'
         return filtered_e, report
 
 
@@ -556,8 +689,8 @@ class Indra(object):
         if self._stmtfilters is None or len(self._stmtfilters) == 0:
             return edge_evidence
         filtered_e = edge_evidence
-        for filter in self._stmtfilters:
-            filtered_e = filter.filter(filtered_e)
+        for sfilter in self._stmtfilters:
+            filtered_e, report = sfilter.filter(filtered_e)
         return filtered_e
 
     def annotate_network(self, net_cx=None, indraresult=None,

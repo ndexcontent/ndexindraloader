@@ -23,6 +23,8 @@ from ndexindraloader.exceptions import NDExIndraLoaderError
 from ndexindraloader.indra import Indra
 from ndexindraloader.indra import SelfLoopStatementFilter
 from ndexindraloader.indra import IncorrectStatementFilter
+from ndexindraloader.indra import SingleReadingStatementFilter
+from ndexindraloader.indra import SparserComplexStatementFilter
 
 
 logger = logging.getLogger(__name__)
@@ -492,7 +494,9 @@ class NDExIndraLoader(object):
                           disable=self._args.disable_tqdm)
 
         stmtfilters = [SelfLoopStatementFilter(),
-                       IncorrectStatementFilter(self._get_curation_list(self._args.curationlist))]
+                       IncorrectStatementFilter(self._get_curation_list(self._args.curations)),
+                       SingleReadingStatementFilter(),
+                       SparserComplexStatementFilter()]
         indra = Indra(stmtfilters=stmtfilters)
         for net_tuple in get_next_network_from_input(self._args.input,
                                                      cachedir=cachedir,
