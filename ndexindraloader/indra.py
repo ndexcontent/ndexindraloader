@@ -254,7 +254,6 @@ class SingleReadingStatementFilter(StatementFilter):
         """
         filtered_e = copy.deepcopy(edge_evidence)
         report = ''
-        source_set = set()
         stmts_to_remove = set()
         for stmtkey in filtered_e['stmts'].keys():
             stmt = filtered_e['stmts'][stmtkey]
@@ -275,7 +274,8 @@ class SingleReadingStatementFilter(StatementFilter):
         removed_cnt = len(stmts_to_remove)
 
         if removed_cnt > 0:
-            report += 'Removed ' + str(removed_cnt) + ' statements that lacked good curations\n'
+            report += 'Removed ' + str(removed_cnt) +\
+                      ' statements with only single reading system source\n'
         return filtered_e, report
 
 
