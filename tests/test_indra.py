@@ -15,10 +15,7 @@ import ndex2
 from ndexindraloader.exceptions import NDExIndraLoaderError
 from ndexindraloader.indra import Indra
 from ndexindraloader import indra
-from ndexindraloader.indra import SelfLoopStatementFilter
-from ndexindraloader.indra import IncorrectStatementFilter
-from ndexindraloader.indra import SingleReadingStatementFilter
-from ndexindraloader.indra import SparserComplexStatementFilter
+from ndexindraloader.indra import StatementFilter
 
 
 class TestIndra(unittest.TestCase):
@@ -236,13 +233,13 @@ class TestIndra(unittest.TestCase):
                          res_cx.get_name())
 
         desc = res_cx.get_network_attribute('description')['v']
-        self.assertEqual(659, len(desc))
+        self.assertEqual(661, len(desc))
         self.assertTrue('This pathway is derived from' in desc)
         self.assertTrue('Additional edges added by NDExIndraLoader' in desc)
         self.assertTrue('using <a href="https://www.indra.bio" '
                         'target="INDRA_Evidence">INDRA service</a>' in desc)
         self.assertEqual(42, len(res_cx.get_nodes()))
-        self.assertEqual(503, len(res_cx.get_edges()))
+        self.assertEqual(541, len(res_cx.get_edges()))
 
         name_to_id_dict = indra.get_node_name_to_id_dict(res_cx)
 
@@ -263,30 +260,20 @@ class TestIndra(unittest.TestCase):
         self.assertTrue('RAP1A binds RAP1B(' in src_to_tar['v'])
         self.assertTrue('RAP1A inhibits RAP1B(' in src_to_tar['v'])
 
-    def get_jsonfiles(self):
-        jsondir = '/Users/churas/src/ndexindraloader/8.1/cache'
-        jsonfiles = []
-        for entry in os.listdir(jsondir):
-            if not entry.endswith('.json'):
-                continue
-            fp = os.path.join(jsondir, entry)
-            if not os.path.isfile(fp):
-                continue
-            jsonfiles.append(fp)
-        return jsonfiles
+    def test_statement_filter_base_class(self):
+        filter = StatementFilter()
+        try:
+            filter.get_description()
+            self.fail('Expected NotImplementedError')
+        except NotImplementedError as ne:
+            self.assertEqual('subclasses should implement', str(ne))
 
-    def test_selfloop(self):
-        print('Test selfloop')
+        try:
+            filter.filter({})
+            self.fail('Expected NotImplementedError')
+        except NotImplementedError as ne:
+            self.assertEqual('subclasses should implement', str(ne))
 
-        filter = SparserComplexStatementFilter()
-        for jfile in self.get_jsonfiles():
-            with open(jfile, 'r') as f:
-                data = json.load(f)
-                for edge_evidence in data['edges']:
-                    res, report = filter.filter(edge_evidence)
-                    if len(report) > 0:
-                        print(report)
-        print('End of selfloop test')
 
 
 
