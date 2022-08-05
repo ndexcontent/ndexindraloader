@@ -14,10 +14,6 @@ from ndexindraloader.indra import SingleReadingStatementFilter
 class TestSingleReadingStatementFilter(unittest.TestCase):
     """Tests for Sparser package."""
 
-    EPHB_FORWARDING_CX = os.path.join(os.path.dirname(__file__), 'data',
-                                      '01c81f4a-6192-11e5-8ac5-06603eb7f'
-                                      '303.cx')
-
     EPHB_FORWARDING_INDRA = os.path.join(os.path.dirname(__file__), 'data',
                                          '01c81f4a-6192-11e5-8ac5-06603eb7f'
                                          '303.json')
