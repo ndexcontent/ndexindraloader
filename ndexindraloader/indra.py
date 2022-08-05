@@ -281,7 +281,7 @@ class SingleReadingStatementFilter(StatementFilter):
 
 class IncorrectStatementFilter(StatementFilter):
     """
-    Filters out statements that are incorrect going of this definition:
+    Filters out statements that are incorrect going off this definition:
 
     .. code-block:: python
 
@@ -347,11 +347,12 @@ class IncorrectStatementFilter(StatementFilter):
         """
         super(StatementFilter, self).__init__()
         self._curations = {}
-        for entry in curationlist:
-            pa_hash = entry['pa_hash']
-            if pa_hash not in self._curations:
-                self._curations[pa_hash] = []
-            self._curations[pa_hash].append(entry)
+        if curationlist is not None:
+            for entry in curationlist:
+                pa_hash = entry['pa_hash']
+                if pa_hash not in self._curations:
+                    self._curations[pa_hash] = []
+                self._curations[pa_hash].append(entry)
 
     def get_description(self):
         """
@@ -367,7 +368,7 @@ class IncorrectStatementFilter(StatementFilter):
         """
         check all the curations matching that hash
         remove statement if all curations do not have
-        the following tags: correct, hypothesis, act_vs_amt
+        any of following tags: correct, hypothesis, act_vs_amt
         but keep if at least one does
 
         :param curations:
