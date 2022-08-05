@@ -446,20 +446,28 @@ class SelfLoopStatementFilter(StatementFilter):
         filtered_e = copy.deepcopy(edge_evidence)
         entity_name_set = set()
         report = ''
+        removed_cnt = 0
+        stmts_to_remove = set()
         for entity in edge_evidence['edge']:
             entity_name_set.add(entity['name'])
 
         if len(entity_name_set) <= 1:
-            report += '1 or less sources/targets nodes in edge: ' + str(entity) + '\n'
+            removed_cnt = len(filtered_e['stmts'])
             filtered_e['stmts'] = {}
 
         for stmtkey in filtered_e['stmts'].keys():
             stmt = filtered_e['stmts'][stmtkey]
             english_clean = re.sub('\.$', '', stmt['english'])
             split_english = english_clean.split()
-            if split_english[0] == split_english[1]:
-                report += split_english[0] + ' source matches target. Removing statement' + '\n'
+            if split_english[0] == split_english[2]:
+                stmts_to_remove.add(stmtkey)
+
+        if len(stmts_to_remove) > 0:
+            for stmtkey in stmts_to_remove:
                 del filtered_e['stmts'][stmtkey]
+            removed_cnt = len(stmts_to_remove)
+        if removed_cnt > 0:
+            report += 'Removed ' + str(removed_cnt) + ' self loop statements\n'
         return filtered_e, report
 
 
