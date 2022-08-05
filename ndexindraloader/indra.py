@@ -188,7 +188,6 @@ class SparserComplexStatementFilter(StatementFilter):
         """
         filtered_e = copy.deepcopy(edge_evidence)
         report = ''
-        source_set = set()
         stmts_to_remove = set()
         for stmtkey in filtered_e['stmts'].keys():
             stmt = filtered_e['stmts'][stmtkey]
