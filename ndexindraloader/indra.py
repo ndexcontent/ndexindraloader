@@ -6,6 +6,7 @@ import re
 import logging
 import requests
 import math
+import html
 import ndexindraloader
 from .exceptions import NDExIndraLoaderError
 
@@ -212,6 +213,66 @@ class SparserComplexStatementFilter(StatementFilter):
 
         if removed_cnt > 0:
             report += 'Removed ' + str(removed_cnt) + ' sparser complex statements\n'
+        return filtered_e, report
+
+
+class MedscanStatementFilter(StatementFilter):
+    """
+    Filter out statements that only have evidence from medscan
+
+    This is because medscan data is private and cannot be
+    seen. https://ndexbio.atlassian.net/browse/UD-2091
+
+
+    """
+    def __init__(self):
+        """
+        Constructor
+
+        """
+        super(StatementFilter, self).__init__()
+
+    def get_description(self):
+        """
+        Outputs description of what this filter does
+
+        :return: Summary of what this filter does
+        :rtype: str
+        """
+        return 'MedscanStatementFilter: Removes statements with ' \
+               'only medscan ' \
+               'as source of evidence'
+
+    def filter(self, edge_evidence):
+        """
+        Removes incorrect statements
+
+        :param edge_evidence:
+        :return:
+        """
+        filtered_e = copy.deepcopy(edge_evidence)
+        report = ''
+        stmts_to_remove = set()
+        for stmtkey in filtered_e['stmts'].keys():
+            stmt = filtered_e['stmts'][stmtkey]
+
+            # we have more then one source, no filtering
+            # needed
+            if len(stmt['source_counts'].keys()) > 1:
+                continue
+
+            source = list(stmt['source_counts'].keys())[0]
+            # if the source is sparser regardless of evidence
+            # count, toss it
+            if source == 'medscan':
+                stmts_to_remove.add(stmtkey)
+
+        for stmtkey in stmts_to_remove:
+            del filtered_e['stmts'][stmtkey]
+        removed_cnt = len(stmts_to_remove)
+
+        if removed_cnt > 0:
+            report += 'Removed ' + str(removed_cnt) + ' medscan statements\n'
         return filtered_e, report
 
 
@@ -1082,7 +1143,7 @@ class Indra(object):
         :return:
         """
         indra_url = Indra.STATEMENT_URL + '/from_agents?subject=' +\
-            thesubject + '&object=' + theobject + '&type=' + thetype +\
+            html.escape(thesubject) + '&object=' + html.escape(theobject) + '&type=' + html.escape(thetype) +\
             '&format=html&expand_all=true'
 
         return '<a href="' + str(indra_url) +\
@@ -1100,7 +1161,7 @@ class Indra(object):
         :return:
         """
         indra_url = Indra.STATEMENT_URL + '/from_agents?agent0=' +\
-            theagent0 + '&agent1=' + theagent1 +\
+            html.escape(theagent0) + '&agent1=' + html.escape(theagent1) +\
             '&format=html&expand_all=true'
 
         return '<a href="' + str(indra_url) +\
