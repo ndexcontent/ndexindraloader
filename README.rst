@@ -91,13 +91,24 @@ the following:
         .
         .
 
+2. Any self loop statements are removed (see SelfLoopStatementFilter class in indra.py)
 
+3. Removes evidence from statements whose curations are all incorrect (are not 'correct', 'hypothesis', or 'act_vs_amt')
+   (see IncorrectStatementFilter class in indra.py)
 
-2. For each "edge", the statements above are grouped by their "english" phrase. If multiple statements have matching
+4. Removes evidence whose only source is a single reading source (evidence count of 1)
+   (see SingleReadingStatementFilter class in indra.py)
+
+5. Removes evidence where statement type is complex and the only source is sparser
+   (see SparserComplexStatementFilter class in indra.py)
+
+6. Removes evidence where only source is medscan(see MedscanStatementFilter class in indra.py)
+
+7. For each "edge", the statements above are grouped by their "english" phrase. If multiple statements have matching
 ``stmt_hash`` values only one is kept.
 
 
-3. The grouped statements are sorted by evidence count and added to ``Relationships`` edge attribute in the following format:
+8. The grouped statements are sorted by evidence count and added to ``Relationships`` edge attribute in the following format:
 
     .. code-block::
 
@@ -118,15 +129,15 @@ total evidence count in parenthesis.
         * FZD2 binds WNT3A(7)
         * WNT3A activates FZD2(3)
 
-4. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
+9. A single edge is created and the above edge attributes are added. The edge **interaction** is set to ``interacts with``
 
-5. ``__edge_source`` edge attribute set to ``INDRA``.
+10. ``__edge_source`` edge attribute set to ``INDRA``.
 
-6. If ``__directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **SOURCE** and **TARGET**
+11. If ``__directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **SOURCE** and **TARGET**
 
-7. If ``__reverse_directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **TARGET** and **SOURCE**
+12. If ``__reverse_directed`` is set to ``True`` if interactions outside of ``ActiveForm, Association, Complex, Migration`` were found between **TARGET** and **SOURCE**
 
-8. ``__relationship_score`` is set to log base 2 of total evidence count for edge
+13. ``__relationship_score`` is set to log base 2 of total evidence count for edge
 
 Dependencies
 ------------
