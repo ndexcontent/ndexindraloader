@@ -25,6 +25,7 @@ from ndexindraloader.indra import SelfLoopStatementFilter
 from ndexindraloader.indra import IncorrectStatementFilter
 from ndexindraloader.indra import SingleReadingStatementFilter
 from ndexindraloader.indra import SparserComplexStatementFilter
+from ndexindraloader.indra import MedscanStatementFilter
 
 
 logger = logging.getLogger(__name__)
@@ -496,7 +497,8 @@ class NDExIndraLoader(object):
         stmtfilters = [SelfLoopStatementFilter(),
                        IncorrectStatementFilter(self._get_curation_list(self._args.curations)),
                        SingleReadingStatementFilter(),
-                       SparserComplexStatementFilter()]
+                       SparserComplexStatementFilter(),
+                       MedscanStatementFilter()]
         indra = Indra(stmtfilters=stmtfilters)
         for net_tuple in get_next_network_from_input(self._args.input,
                                                      cachedir=cachedir,
