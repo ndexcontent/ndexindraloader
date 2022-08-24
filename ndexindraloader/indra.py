@@ -1162,7 +1162,7 @@ class Indra(object):
         """
         indra_url = Indra.STATEMENT_URL + '/from_agents?agent0=' +\
             html.escape(theagent0) + '&agent1=' + html.escape(theagent1) +\
-            '&format=html&expand_all=true'
+            '&format=html&expand_all=false'
 
         return '<a href="' + str(indra_url) +\
                '" target="' + self._browser_target + '">' +\
