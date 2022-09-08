@@ -5,9 +5,11 @@ import argparse
 import sys
 import json
 import uuid
+import time
 import logging
 import configparser
 from logging import config
+import requests
 from tqdm import tqdm
 import networkx as nx
 
@@ -68,7 +70,10 @@ def _parse_arguments(desc, args):
                              'call. If no output exists, the REST query '
                              'is made and the results are saved here.')
     parser.add_argument('--curations',
-                        help='INDRA curations json file')
+                        help='INDRA curations json file OR api key to download curations'
+                             'from INDRA service url set via --curationsurl')
+    parser.add_argument('--curationsurl', default='https://db.indra.bio/curation/list',
+                        help='URL to download curations from INDRA')
     parser.add_argument('--saveasfile',
                         help='If set, writes Indra annotated networks as CX '
                              'under directory specified by the value of this '
@@ -116,14 +121,27 @@ def _parse_arguments(desc, args):
                              'applied to network.')
     parser.add_argument('--tmpdir', default='.',
                         help='Temp directory used for Cytoscape layouts')
-    parser.add_argument('--layout', default='-',
+    parser.add_argument('--layout', default='cdqforcelayout',
                         help='Specifies layout '
                              'algorithm to run. If Cytoscape is running '
                              'and py4cytoscape is loaded any layout from '
                              'Cytoscape can be used. If "-" is passed in '
                              'force-directed from Cytoscape will '
                              'be used. If no Cytoscape is available, '
-                             '"spring" from networkx is supported')
+                             '"spring" from networkx is supported. Also '
+                             'cdqforcelayout available from '
+                             'cytolayouts.ucsd.edu/cd/ service')
+    parser.add_argument('--cytolayouturl', default='http://cytolayouts.ucsd.edu/cd/communitydetection/v1',
+                        help='URL of Cytoscape Layout Service. Used to run cdqforce layout if specified'
+                             ' via --layout parameter')
+    parser.add_argument('--cytolayoutargs', default='{"--rounds": "20",'
+                                                    '"--node_size": "50",'
+                                                    '"--sparsity": "30", "--center_attractor_scale": "5"}',
+                        help='Arguments (as json) to pass into cytoscape layout service algorithm. '
+                             'NOTE: arguments must be a json fragment of format {KEY: VALUE} where both '
+                             'KEY and VALUE are strings '
+                             'Default '
+                             'are parameters for cdqforcelayout. ')
     parser.add_argument('--cyresturl',
                         default=DEFAULT_CYREST_API,
                         help='URL of CyREST API. Default value '
@@ -214,6 +232,17 @@ def get_next_network_from_input(input, cachedir=None, server=None, username=None
         with open(input, 'r') as f:
             for line in f:
                 clean_line = line.rstrip()
+                if os.path.isfile(clean_line) and clean_line.lower().endswith('.cx'):
+                    net_cx = ndex2.create_nice_cx_from_file(clean_line)
+                    file_name = os.path.basename(clean_line)
+                    cache_file = None
+                    if cachedir is not None:
+                        cache_file = os.path.join(cachedir,
+                                                  file_name + '.json')
+                        if not os.path.isfile(cache_file):
+                            cache_file = None
+                    yield net_cx, file_name, cache_file
+                    continue
                 if len(clean_line) < 36:
                     continue
                 net_cx = ndexobj.create_nice_cx_from_server(server=server,
@@ -368,6 +397,60 @@ class NDExIndraLoader(object):
                  'x': float(g.pos[n][0]),
                  'y': -float(g.pos[n][1])} for n in g.pos]
 
+    def _apply_cytolayoutservice_layout(self, network, layoutname=None,
+                                        layoutargs=None):
+        """
+
+        :param network:
+        :param layoutname:
+        :param layoutargs:
+        :return:
+        """
+
+        payload = {'algorithm': layoutname,
+                   'data': network.to_cx()}
+        if layoutargs is not None:
+            payload['customParameters'] = layoutargs
+        res = requests.post(self._args.cytolayouturl,
+                            headers={'Content-Type': 'application/json',
+                                     'Accept': 'application/json'},
+                            json=payload, timeout=30)
+        if res.status_code != 202:
+            raise NDExIndraLoaderError('Error submitting layout task ' +
+                                        str(res.status_code) + ' : ' + str(res.text))
+        task_id = res.json()['id']
+        complete = False
+        while complete is False:
+            logger.debug('Checking status of task: ' + str(task_id))
+            res = requests.get(self._args.cytolayouturl + '/' + str(task_id) + '/status',
+                               headers={'Content-Type': 'application/json',
+                                        'Accept': 'application/json'})
+            if res.status_code != 200:
+                logger.debug('Request came back with error, '
+                             'sleeping 1 second and trying '
+                             'again : ' + str(res.text))
+                time.sleep(1)
+                continue
+
+            status_dict = res.json()
+            if status_dict['progress'] == 100:
+                if status_dict['status'] != 'complete':
+                    raise NDExIndraLoaderError('Task failed: ' + str(status_dict))
+                break
+            time.sleep(1)
+
+        # if we got here then the task completed successfully
+        # grab the result and add to cartesianLayout aspect of
+        # nice_cx and write that out
+        res = requests.get(self._args.cytolayouturl + '/' + str(task_id),
+                           headers={'Content-Type': 'application/json',
+                                    'Accept': 'application/json'})
+
+        if res.status_code != 200:
+            raise NDExIndraLoaderError('Error getting layout coordinates')
+
+        network.set_opaque_aspect('cartesianLayout', res.json()['result'])
+
     def _apply_simple_spring_layout(self, network, iterations=50):
         """
         Applies simple spring network by using
@@ -495,9 +578,10 @@ class NDExIndraLoader(object):
                           disable=self._args.disable_tqdm)
 
         stmtfilters = [SelfLoopStatementFilter(),
-                       IncorrectStatementFilter(self._get_curation_list(self._args.curations)),
-                       SingleReadingStatementFilter(),
                        SparserComplexStatementFilter(),
+                       SingleReadingStatementFilter(),
+                       IncorrectStatementFilter(self._get_curation_list(self._args.curations,
+                                                                        curationurl=self._args.curationsurl)),
                        MedscanStatementFilter()]
         indra = Indra(stmtfilters=stmtfilters)
         for net_tuple in get_next_network_from_input(self._args.input,
@@ -535,6 +619,12 @@ class NDExIndraLoader(object):
             if self._args.layout is not None:
                 if self._args.layout == 'spring':
                     self._apply_simple_spring_layout(net_cx)
+                elif self._args.layout == 'cdqforcelayout':
+                    largs = None
+                    if self._args.cytolayoutargs is not None:
+                        largs = json.loads(self._args.cytolayoutargs)
+                    self._apply_cytolayoutservice_layout(net_cx, layoutname=self._args.layout,
+                                                         layoutargs=largs)
                 else:
                     if self._args.layout == '-':
                         self._args.layout = 'force-directed'
@@ -566,15 +656,25 @@ class NDExIndraLoader(object):
 
         return 0
 
-    def _get_curation_list(self, curation):
+    def _get_curation_list(self, curation, curationurl=None):
         """
 
         :param curation:
         :return:
         """
-        with open(curation, 'r') as f:
-            return json.load(f)
+        if os.path.isfile(curation):
+            with open(curation, 'r') as f:
+                return json.load(f)
 
+        # curation is not a file, assume it is an api key and download
+        # curations from curationurl and return as dict
+        resp = requests.get(curationurl + '?api_key=' + str(curation))
+        if resp.status_code != 200:
+            raise NDExIndraLoaderError('Received ' + str(resp.status_code) +
+                                       ' status code trying '
+                                       'to get curations: ' +
+                                       str(resp.text))
+        return resp.json()
 
 def main(args):
     """
