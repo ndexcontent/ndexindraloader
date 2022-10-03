@@ -255,7 +255,7 @@ class TestIndra(unittest.TestCase):
 
         self.assertIsNotNone(rap_edge)
         src_to_tar = res_cx.get_edge_attribute(rap_edge, Indra.RELATIONSHIPS)
-        self.assertEqual(1065, len(src_to_tar['v']))
+        self.assertEqual(1066, len(src_to_tar['v']))
         self.assertTrue('All Evidences (' in src_to_tar['v'])
         self.assertTrue('RAP1A binds RAP1B(' in src_to_tar['v'])
         self.assertTrue('RAP1A inhibits RAP1B(' in src_to_tar['v'])
